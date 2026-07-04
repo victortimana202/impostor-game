@@ -7,6 +7,8 @@ import Pill from './Pill';
 import Setup from './Setup';
 import GameModeSelector from './GameModeSelector';
 import OnlineLobby from './OnlineLobby';
+import VoiceChat from './VoiceChat';
+import DrawingBoard from './DrawingBoard';
 import socketService from '../services/socketService';
 
 export default function ImpostorGame() {
@@ -146,26 +148,55 @@ export default function ImpostorGame() {
       const data = await fetchWord(cfg.diff, cfg.giveHint, cfg.theme);
       setWord(data);
       
-      const names = cfg.names.filter(n => n.trim());
-      const shuffled = [...names].sort(() => Math.random() - 0.5);
-      const impSet = new Set(shuffled.slice(0, cfg.numImp));
-      
-      setPlayers(names.map(n => ({
-        name: n,
-        role: impSet.has(n) ? "impostor" : "citizen",
-        word: impSet.has(n) ? (data.impostorHint || null) : data.word,
-        alive: true,
-      })));
-      
-      setRevealIdx(0);
-      setShowingCard(false);
-      setTimerOn(false);
-      setVoterIdx(0);
-      setVotes({});
-      setEliminated([]);
-      setRoundHistory([]);
-      
-      setPhase("reveal");
+      if (gameMode === 'online' && isOnlineHost) {
+        // Modo online: usar los jugadores actuales de la sala
+        const playerNames = players.map(p => p.name);
+        const shuffled = [...playerNames].sort(() => Math.random() - 0.5);
+        const impSet = new Set(shuffled.slice(0, cfg.numImp));
+        
+        const playerRoles = playerNames.map(n => ({
+          name: n,
+          role: impSet.has(n) ? "impostor" : "citizen",
+          word: impSet.has(n) ? (data.impostorHint || null) : data.word,
+          alive: true,
+        }));
+        
+        setPlayers(playerRoles);
+        setRevealIdx(0);
+        setShowingCard(false);
+        setTimerOn(false);
+        setVoterIdx(0);
+        setVotes({});
+        setEliminated([]);
+        setRoundHistory([]);
+        
+        // Enviar nueva ronda a todos
+        socketService.startGame(cfg, data, playerRoles);
+        
+        setPhase("reveal");
+      } else {
+        // Modo local
+        const names = cfg.names.filter(n => n.trim());
+        const shuffled = [...names].sort(() => Math.random() - 0.5);
+        const impSet = new Set(shuffled.slice(0, cfg.numImp));
+        
+        setPlayers(names.map(n => ({
+          name: n,
+          role: impSet.has(n) ? "impostor" : "citizen",
+          word: impSet.has(n) ? (data.impostorHint || null) : data.word,
+          alive: true,
+        })));
+        
+        setRevealIdx(0);
+        setShowingCard(false);
+        setTimerOn(false);
+        setVoterIdx(0);
+        setVotes({});
+        setEliminated([]);
+        setRoundHistory([]);
+        
+        setPhase("reveal");
+      }
     } catch (e) {
       setError("No se pudo conectar con la IA. Verifica tu internet e inténtalo de nuevo.");
       setPhase("setup");
@@ -566,6 +597,17 @@ export default function ImpostorGame() {
               </>
             )}
           </div>
+          
+          {gameMode === 'online' && (
+            <>
+              <VoiceChat roomCode={socketService.roomCode} myPlayerName={myPlayerName} />
+              <DrawingBoard 
+                roomCode={socketService.roomCode} 
+                myPlayerName={myPlayerName}
+                gameMode={gameMode}
+              />
+            </>
+          )}
           
           {gameMode === 'online' && !isOnlineHost ? (
             <div style={{

@@ -100,6 +100,36 @@ class SocketService {
     });
   }
 
+  sendDrawing(roomCode, x, y, color, lineWidth, isDrawing) {
+    this.socket.emit('send-drawing', {
+      roomCode,
+      x,
+      y,
+      color,
+      lineWidth,
+      isDrawing
+    });
+  }
+
+  clearDrawing(roomCode) {
+    this.socket.emit('clear-drawing', { roomCode });
+  }
+
+  onDrawing(callback) {
+    this.socket.on('drawing', callback);
+  }
+
+  onDrawingCleared(callback) {
+    this.socket.on('drawing-cleared', callback);
+  }
+
+  offDrawing() {
+    if (this.socket) {
+      this.socket.off('drawing');
+      this.socket.off('drawing-cleared');
+    }
+  }
+
   offLobby() {
     if (this.socket) {
       this.socket.off('player-joined');

@@ -90,6 +90,14 @@ io.on('connection', (socket) => {
     io.to(roomCode).emit('vote-cast', { voter, target });
   });
 
+  socket.on('send-drawing', ({ roomCode, x, y, color, lineWidth, isDrawing }) => {
+    socket.to(roomCode).emit('drawing', { x, y, color, lineWidth, isDrawing });
+  });
+
+  socket.on('clear-drawing', ({ roomCode }) => {
+    io.to(roomCode).emit('drawing-cleared');
+  });
+
   socket.on('disconnect', () => {
     console.log('Usuario desconectado:', socket.id);
     
