@@ -100,19 +100,25 @@ class SocketService {
     });
   }
 
-  sendDrawing(roomCode, x, y, color, lineWidth, isDrawing) {
+  sendDrawing(roomCode, x, y, color, lineWidth, isDrawing, tool, opacity) {
     this.socket.emit('send-drawing', {
       roomCode,
       x,
       y,
       color,
       lineWidth,
-      isDrawing
+      isDrawing,
+      tool,
+      opacity
     });
   }
 
   clearDrawing(roomCode) {
     this.socket.emit('clear-drawing', { roomCode });
+  }
+
+  sendDrawingComment(roomCode, comment) {
+    this.socket.emit('send-drawing-comment', { roomCode, ...comment });
   }
 
   onDrawing(callback) {
@@ -123,10 +129,61 @@ class SocketService {
     this.socket.on('drawing-cleared', callback);
   }
 
+  onDrawingComment(callback) {
+    this.socket.on('drawing-comment', callback);
+  }
+
   offDrawing() {
     if (this.socket) {
       this.socket.off('drawing');
       this.socket.off('drawing-cleared');
+      this.socket.off('drawing-comment');
+    }
+  }
+
+  // Métodos de voz WebRTC
+  joinVoiceRoom(roomCode, playerName) {
+    this.socket.emit('join-voice-room', { roomCode, playerName });
+  }
+
+  leaveVoiceRoom(roomCode) {
+    this.socket.emit('leave-voice-room', { roomCode });
+  }
+
+  sendVoiceOffer(roomCode, targetUserId, offer) {
+    this.socket.emit('voice-offer', { roomCode, targetUserId, offer });
+  }
+
+  sendVoiceAnswer(roomCode, targetUserId, answer) {
+    this.socket.emit('voice-answer', { roomCode, targetUserId, answer });
+  }
+
+  sendVoiceIceCandidate(roomCode, targetUserId, candidate) {
+    this.socket.emit('voice-ice-candidate', { roomCode, targetUserId, candidate });
+  }
+
+  onVoiceOffer(callback) {
+    this.socket.on('voice-offer', callback);
+  }
+
+  onVoiceAnswer(callback) {
+    this.socket.on('voice-answer', callback);
+  }
+
+  onVoiceIceCandidate(callback) {
+    this.socket.on('voice-ice-candidate', callback);
+  }
+
+  onVoiceUserDisconnected(callback) {
+    this.socket.on('voice-user-disconnected', callback);
+  }
+
+  offVoice() {
+    if (this.socket) {
+      this.socket.off('voice-offer');
+      this.socket.off('voice-answer');
+      this.socket.off('voice-ice-candidate');
+      this.socket.off('voice-user-disconnected');
     }
   }
 

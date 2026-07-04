@@ -90,12 +90,39 @@ io.on('connection', (socket) => {
     io.to(roomCode).emit('vote-cast', { voter, target });
   });
 
-  socket.on('send-drawing', ({ roomCode, x, y, color, lineWidth, isDrawing }) => {
-    socket.to(roomCode).emit('drawing', { x, y, color, lineWidth, isDrawing });
+  socket.on('send-drawing', ({ roomCode, x, y, color, lineWidth, isDrawing, tool, opacity }) => {
+    socket.to(roomCode).emit('drawing', { x, y, color, lineWidth, isDrawing, tool, opacity });
   });
 
   socket.on('clear-drawing', ({ roomCode }) => {
     io.to(roomCode).emit('drawing-cleared');
+  });
+
+  socket.on('send-drawing-comment', ({ roomCode, playerName, comment, timestamp }) => {
+    io.to(roomCode).emit('drawing-comment', { playerName, comment, timestamp });
+  });
+
+  // WebRTC Voice Chat
+  socket.on('join-voice-room', ({ roomCode, playerName }) => {
+    socket.join(`voice-${roomCode}`);
+    socket.to(`voice-${roomCode}`).emit('voice-user-joined', { userId: socket.id, playerName });
+  });
+
+  socket.on('leave-voice-room', ({ roomCode }) => {
+    socket.to(`voice-${roomCode}`).emit('voice-user-disconnected', { userId: socket.id });
+    socket.leave(`voice-${roomCode}`);
+  });
+
+  socket.on('voice-offer', ({ roomCode, targetUserId, offer }) => {
+    io.to(targetUserId).emit('voice-offer', { from: socket.id, offer });
+  });
+
+  socket.on('voice-answer', ({ roomCode, targetUserId, answer }) => {
+    io.to(targetUserId).emit('voice-answer', { from: socket.id, answer });
+  });
+
+  socket.on('voice-ice-candidate', ({ roomCode, targetUserId, candidate }) => {
+    io.to(targetUserId).emit('voice-ice-candidate', { from: socket.id, candidate });
   });
 
   socket.on('disconnect', () => {
