@@ -245,7 +245,13 @@ class SocketService {
 
   // Métodos de Pictionary
   syncPictionaryState(roomCode, gameState) {
+    console.log('📤 [SocketService] Sincronizando estado Pictionary:', gameState);
     this.socket.emit('pictionary-sync-state', { roomCode, gameState });
+  }
+
+  requestPictionaryState(roomCode) {
+    console.log('📥 [SocketService] Solicitando estado actual de Pictionary');
+    this.socket.emit('pictionary-request-state', { roomCode });
   }
 
   sendPictionaryGuess(roomCode, guessData) {
@@ -276,12 +282,17 @@ class SocketService {
     this.socket.on('pictionary-clear-canvas', callback);
   }
 
+  onPictionaryStateRequested(callback) {
+    this.socket.on('pictionary-state-requested', callback);
+  }
+
   offPictionary() {
     if (this.socket) {
       this.socket.off('pictionary-update');
       this.socket.off('pictionary-guess');
       this.socket.off('pictionary-drawing');
       this.socket.off('pictionary-clear-canvas');
+      this.socket.off('pictionary-state-requested');
     }
   }
 

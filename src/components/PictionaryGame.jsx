@@ -55,12 +55,42 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
     socketService.onPictionaryGuess(handleGuessReceived);
     socketService.onPictionaryDrawing(handleDrawingReceived);
     socketService.onPictionaryClear(handleCanvasClear);
+    
+    // Si soy host, escuchar solicitudes de estado
+    if (isHost) {
+      socketService.onPictionaryStateRequested(() => {
+        console.log('📤 [PictionaryGame] Host recibió solicitud de estado, reenviando...');
+        // Reenviar el estado completo actual
+        socketService.syncPictionaryState(roomCode, {
+          phase,
+          playerWords,
+          timeLeft,
+          roundNumber,
+          scores,
+          selectedCategory
+        });
+      });
+    }
 
     return () => {
       console.log('🎨 [PictionaryGame] Desmontando, limpiando eventos');
       socketService.offPictionary();
     };
   }, []);
+
+  // Efecto para detectar si no tengo palabra después de un tiempo
+  useEffect(() => {
+    if (!isHost && phase === 'drawing' && !myWord) {
+      console.log('⚠️ [PictionaryGame] No tengo palabra en fase de dibujo, esperando...');
+      const timer = setTimeout(() => {
+        if (!myWord) {
+          console.log('❌ [PictionaryGame] Aún no tengo palabra después de 2 segundos, solicitando estado');
+          socketService.requestPictionaryState(roomCode);
+        }
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [phase, myWord, isHost]);
 
   useEffect(() => {
     if (phase === 'drawing' && timeLeft > 0) {

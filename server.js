@@ -156,7 +156,15 @@ io.on('connection', (socket) => {
 
   // Pictionary Game Events
   socket.on('pictionary-sync-state', ({ roomCode, gameState }) => {
+    console.log('📤 [Server] Sincronizando estado Pictionary en sala:', roomCode);
     socket.to(roomCode).emit('pictionary-update', { gameState });
+  });
+
+  socket.on('pictionary-request-state', ({ roomCode }) => {
+    console.log('📥 [Server] Solicitud de estado Pictionary de:', socket.id, 'en sala:', roomCode);
+    // El cliente que solicita está pidiendo el estado actual
+    // Emitir a todos en la sala para que el host responda
+    socket.to(roomCode).emit('pictionary-state-requested', { requesterId: socket.id });
   });
 
   socket.on('pictionary-guess', ({ roomCode, playerName, guess, correct, timestamp }) => {
