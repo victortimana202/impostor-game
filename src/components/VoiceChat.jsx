@@ -39,7 +39,22 @@ export default function VoiceChat({ roomCode, myPlayerName }) {
 
   const startVoiceChat = async () => {
     try {
+      console.log('🎤 [VoiceChat] Iniciando chat de voz...');
+      console.log('🎤 [VoiceChat] RoomCode:', roomCode);
+      console.log('🎤 [VoiceChat] PlayerName:', myPlayerName);
+      
+      // Verificar soporte del navegador
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        const errorMsg = 'Tu navegador no soporta acceso al micrófono';
+        console.error('❌ [VoiceChat]', errorMsg);
+        setError(errorMsg);
+        return;
+      }
+      
+      console.log('✅ [VoiceChat] Navegador soporta getUserMedia');
+      
       // Obtener stream de audio local
+      console.log('🎤 [VoiceChat] Solicitando permiso de micrófono...');
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -49,15 +64,18 @@ export default function VoiceChat({ roomCode, myPlayerName }) {
         }
       });
 
+      console.log('✅ [VoiceChat] Micrófono obtenido:', stream.getTracks());
       localStreamRef.current = stream;
 
       // Crear contexto de audio para análisis
+      console.log('🎤 [VoiceChat] Creando contexto de audio...');
       audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
       analyserRef.current = audioContextRef.current.createAnalyser();
       analyserRef.current.fftSize = 256;
       
       const source = audioContextRef.current.createMediaStreamSource(stream);
       source.connect(analyserRef.current);
+      console.log('✅ [VoiceChat] Contexto de audio creado');
 
       // Monitorear actividad de voz local
       detectVoiceActivity();
@@ -66,26 +84,55 @@ export default function VoiceChat({ roomCode, myPlayerName }) {
       setError(null);
 
       // Notificar al servidor que estamos listos para voz
+      console.log('🌐 [VoiceChat] Uniéndose a sala de voz...');
       socketService.joinVoiceRoom(roomCode, myPlayerName);
+      console.log('✅ [VoiceChat] Chat de voz iniciado correctamente');
 
     } catch (err) {
-      console.error('Error al acceder al micrófono:', err);
-      setError('No se pudo acceder al micrófono. Verifica los permisos del navegador.');
+      console.error('❌ [VoiceChat] Error al acceder al micrófono:', err);
+      console.error('❌ [VoiceChat] Error name:', err.name);
+      console.error('❌ [VoiceChat] Error message:', err.message);
+      
+      let errorMsg = 'Error desconocido';
+      
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        errorMsg = 'Permiso de micrófono denegado. Por favor, permite el acceso en tu navegador.';
+      } else if (err.name === 'NotFoundError') {
+        errorMsg = 'No se encontró ningún micrófono. Verifica que tu dispositivo tenga un micrófono conectado.';
+      } else if (err.name === 'NotReadableError') {
+        errorMsg = 'No se puede acceder al micrófono. Puede estar siendo usado por otra aplicación.';
+      } else if (err.name === 'OverconstrainedError') {
+        errorMsg = 'Tu micrófono no cumple con los requisitos de audio.';
+      } else {
+        errorMsg = `Error: ${err.message}`;
+      }
+      
+      setError(errorMsg);
     }
   };
 
   const stopVoiceChat = () => {
+    console.log('⏹️ [VoiceChat] Deteniendo chat de voz...');
+    
     // Detener stream local
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => track.stop());
+      console.log('🎤 [VoiceChat] Deteniendo stream local');
+      localStreamRef.current.getTracks().forEach(track => {
+        track.stop();
+        console.log('✅ [VoiceChat] Track detenido:', track.kind);
+      });
       localStreamRef.current = null;
     }
 
     // Cerrar todas las conexiones peer
+    const peerCount = Object.keys(peerConnectionsRef.current).length;
+    console.log(`🔗 [VoiceChat] Cerrando ${peerCount} conexiones peer`);
     Object.values(peerConnectionsRef.current).forEach(pc => pc.close());
     peerConnectionsRef.current = {};
 
     // Detener streams remotos
+    const remoteCount = Object.keys(remoteStreamsRef.current).length;
+    console.log(`🔊 [VoiceChat] Deteniendo ${remoteCount} streams remotos`);
     Object.values(remoteStreamsRef.current).forEach(stream => {
       stream.getTracks().forEach(track => track.stop());
     });
@@ -93,6 +140,7 @@ export default function VoiceChat({ roomCode, myPlayerName }) {
 
     // Cerrar audio context
     if (audioContextRef.current) {
+      console.log('🎵 [VoiceChat] Cerrando audio context');
       audioContextRef.current.close();
       audioContextRef.current = null;
     }
@@ -105,15 +153,19 @@ export default function VoiceChat({ roomCode, myPlayerName }) {
     setActiveSpeakers(new Set());
 
     // Notificar al servidor
+    console.log('🌐 [VoiceChat] Saliendo de sala de voz');
     socketService.leaveVoiceRoom(roomCode);
+    console.log('✅ [VoiceChat] Chat de voz detenido');
   };
 
   const createPeerConnection = (targetUserId) => {
+    console.log('🔗 [VoiceChat] Creando conexión peer con:', targetUserId);
     const pc = new RTCPeerConnection(iceServers);
 
     // Agregar track local
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => {
+        console.log('➕ [VoiceChat] Agregando track local:', track.kind);
         pc.addTrack(track, localStreamRef.current);
       });
     }
@@ -121,12 +173,23 @@ export default function VoiceChat({ roomCode, myPlayerName }) {
     // Manejar ICE candidates
     pc.onicecandidate = (event) => {
       if (event.candidate) {
+        console.log('🧊 [VoiceChat] ICE candidate para:', targetUserId);
         socketService.sendVoiceIceCandidate(roomCode, targetUserId, event.candidate);
       }
     };
 
+    // Manejar conexión
+    pc.onconnectionstatechange = () => {
+      console.log(`🔌 [VoiceChat] Estado conexión con ${targetUserId}:`, pc.connectionState);
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      console.log(`🧊 [VoiceChat] Estado ICE con ${targetUserId}:`, pc.iceConnectionState);
+    };
+
     // Manejar stream remoto
     pc.ontrack = (event) => {
+      console.log('📥 [VoiceChat] Track remoto recibido de:', targetUserId);
       const remoteStream = event.streams[0];
       remoteStreamsRef.current[targetUserId] = remoteStream;
       
@@ -135,47 +198,82 @@ export default function VoiceChat({ roomCode, myPlayerName }) {
       audio.srcObject = remoteStream;
       audio.volume = volume / 100;
       if (!isDeafened) {
-        audio.play().catch(e => console.error('Error al reproducir audio:', e));
+        audio.play()
+          .then(() => console.log('✅ [VoiceChat] Audio reproduciendo de:', targetUserId))
+          .catch(e => console.error('❌ [VoiceChat] Error al reproducir audio:', e));
       }
     };
 
     peerConnectionsRef.current[targetUserId] = pc;
+    console.log('✅ [VoiceChat] Conexión peer creada con:', targetUserId);
     return pc;
   };
 
   const handleReceiveOffer = async ({ from, offer }) => {
-    const pc = createPeerConnection(from);
-    await pc.setRemoteDescription(new RTCSessionDescription(offer));
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    socketService.sendVoiceAnswer(roomCode, from, answer);
+    console.log('📨 [VoiceChat] Recibiendo offer de:', from);
+    try {
+      const pc = createPeerConnection(from);
+      await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      console.log('✅ [VoiceChat] Remote description establecida');
+      
+      const answer = await pc.createAnswer();
+      console.log('✅ [VoiceChat] Answer creada');
+      
+      await pc.setLocalDescription(answer);
+      console.log('✅ [VoiceChat] Local description establecida');
+      
+      socketService.sendVoiceAnswer(roomCode, from, answer);
+      console.log('📤 [VoiceChat] Answer enviada a:', from);
+    } catch (err) {
+      console.error('❌ [VoiceChat] Error en handleReceiveOffer:', err);
+    }
   };
 
   const handleReceiveAnswer = async ({ from, answer }) => {
-    const pc = peerConnectionsRef.current[from];
-    if (pc) {
-      await pc.setRemoteDescription(new RTCSessionDescription(answer));
+    console.log('📨 [VoiceChat] Recibiendo answer de:', from);
+    try {
+      const pc = peerConnectionsRef.current[from];
+      if (pc) {
+        await pc.setRemoteDescription(new RTCSessionDescription(answer));
+        console.log('✅ [VoiceChat] Answer procesada de:', from);
+      } else {
+        console.warn('⚠️ [VoiceChat] No hay peer connection para:', from);
+      }
+    } catch (err) {
+      console.error('❌ [VoiceChat] Error en handleReceiveAnswer:', err);
     }
   };
 
   const handleReceiveIceCandidate = async ({ from, candidate }) => {
-    const pc = peerConnectionsRef.current[from];
-    if (pc) {
-      await pc.addIceCandidate(new RTCIceCandidate(candidate));
+    console.log('🧊 [VoiceChat] Recibiendo ICE candidate de:', from);
+    try {
+      const pc = peerConnectionsRef.current[from];
+      if (pc) {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        console.log('✅ [VoiceChat] ICE candidate agregado de:', from);
+      } else {
+        console.warn('⚠️ [VoiceChat] No hay peer connection para:', from);
+      }
+    } catch (err) {
+      console.error('❌ [VoiceChat] Error en handleReceiveIceCandidate:', err);
     }
   };
 
   const handleUserDisconnected = ({ userId }) => {
+    console.log('👋 [VoiceChat] Usuario desconectado:', userId);
+    
     const pc = peerConnectionsRef.current[userId];
     if (pc) {
       pc.close();
       delete peerConnectionsRef.current[userId];
+      console.log('✅ [VoiceChat] Peer connection cerrada');
     }
     
     const stream = remoteStreamsRef.current[userId];
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
       delete remoteStreamsRef.current[userId];
+      console.log('✅ [VoiceChat] Stream remoto detenido');
     }
 
     setActiveSpeakers(prev => {
@@ -212,22 +310,28 @@ export default function VoiceChat({ roomCode, myPlayerName }) {
 
   const toggleMute = () => {
     if (localStreamRef.current) {
+      const newMuted = !isMuted;
       localStreamRef.current.getAudioTracks().forEach(track => {
         track.enabled = !track.enabled;
+        console.log(`🔇 [VoiceChat] Track ${track.kind} ${newMuted ? 'muteado' : 'desmuteado'}`);
       });
-      setIsMuted(!isMuted);
+      setIsMuted(newMuted);
+      console.log(`🔇 [VoiceChat] Micrófono ${newMuted ? 'MUTEADO' : 'ACTIVO'}`);
     }
   };
 
   const toggleDeafen = () => {
-    setIsDeafened(!isDeafened);
+    const newDeafened = !isDeafened;
+    setIsDeafened(newDeafened);
+    console.log(`🔇 [VoiceChat] Deafen ${newDeafened ? 'ACTIVADO' : 'DESACTIVADO'}`);
     
     // Silenciar todos los audios remotos
     Object.values(remoteStreamsRef.current).forEach(stream => {
       const audioElements = document.querySelectorAll('audio');
       audioElements.forEach(audio => {
         if (audio.srcObject === stream) {
-          audio.volume = isDeafened ? (volume / 100) : 0;
+          audio.volume = newDeafened ? 0 : (volume / 100);
+          console.log(`🔊 [VoiceChat] Volumen audio remoto: ${audio.volume}`);
         }
       });
     });
@@ -235,6 +339,7 @@ export default function VoiceChat({ roomCode, myPlayerName }) {
 
   const handleVolumeChange = (newVolume) => {
     setVolume(newVolume);
+    console.log(`🔊 [VoiceChat] Volumen cambiado a: ${newVolume}%`);
     
     // Actualizar volumen de todos los audios
     const audioElements = document.querySelectorAll('audio');

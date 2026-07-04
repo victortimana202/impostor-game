@@ -229,6 +229,48 @@ class SocketService {
     }
   }
 
+  // Métodos de Pictionary V2 (con turnos)
+  syncPictionaryV2State(roomCode, gameState) {
+    this.socket.emit('pictionary-v2-sync-state', { roomCode, gameState });
+  }
+
+  sendPictionaryV2Guess(roomCode, guessData) {
+    this.socket.emit('pictionary-v2-guess', { roomCode, ...guessData });
+  }
+
+  sendPictionaryV2Drawing(roomCode, x, y, color, lineWidth, isDrawing, tool) {
+    this.socket.emit('pictionary-v2-drawing', { roomCode, x, y, color, lineWidth, isDrawing, tool });
+  }
+
+  clearPictionaryV2Canvas(roomCode) {
+    this.socket.emit('pictionary-v2-clear-canvas', { roomCode });
+  }
+
+  onPictionaryV2Update(callback) {
+    this.socket.on('pictionary-v2-update', callback);
+  }
+
+  onPictionaryV2Guess(callback) {
+    this.socket.on('pictionary-v2-guess', callback);
+  }
+
+  onPictionaryV2Drawing(callback) {
+    this.socket.on('pictionary-v2-drawing', callback);
+  }
+
+  onPictionaryV2Clear(callback) {
+    this.socket.on('pictionary-v2-clear-canvas', callback);
+  }
+
+  offPictionaryV2() {
+    if (this.socket) {
+      this.socket.off('pictionary-v2-update');
+      this.socket.off('pictionary-v2-guess');
+      this.socket.off('pictionary-v2-drawing');
+      this.socket.off('pictionary-v2-clear-canvas');
+    }
+  }
+
   offLobby() {
     if (this.socket) {
       this.socket.off('player-joined');

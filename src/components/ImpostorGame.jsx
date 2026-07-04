@@ -9,7 +9,7 @@ import GameModeSelector from './GameModeSelector';
 import OnlineLobby from './OnlineLobby';
 import VoiceChat from './VoiceChat';
 import DrawingBoard from './DrawingBoard';
-import PictionaryGame from './PictionaryGame';
+import PictionaryGameV2 from './PictionaryGameV2';
 import socketService from '../services/socketService';
 
 export default function ImpostorGame() {
@@ -381,7 +381,7 @@ export default function ImpostorGame() {
       boxSizing: "border-box",
     }}>
       {showPictionary ? (
-        <PictionaryGame
+        <PictionaryGameV2
           roomCode={socketService.roomCode}
           players={players}
           onBack={backFromPictionary}

@@ -142,6 +142,23 @@ io.on('connection', (socket) => {
     io.to(roomCode).emit('pictionary-clear-canvas');
   });
 
+  // Pictionary V2 Events (con turnos)
+  socket.on('pictionary-v2-sync-state', ({ roomCode, gameState }) => {
+    socket.to(roomCode).emit('pictionary-v2-update', { gameState });
+  });
+
+  socket.on('pictionary-v2-guess', ({ roomCode, playerName, guess, correct, points, timestamp }) => {
+    io.to(roomCode).emit('pictionary-v2-guess', { playerName, guess, correct, points, timestamp });
+  });
+
+  socket.on('pictionary-v2-drawing', ({ roomCode, x, y, color, lineWidth, isDrawing, tool }) => {
+    socket.to(roomCode).emit('pictionary-v2-drawing', { x, y, color, lineWidth, isDrawing, tool });
+  });
+
+  socket.on('pictionary-v2-clear-canvas', ({ roomCode }) => {
+    io.to(roomCode).emit('pictionary-v2-clear-canvas');
+  });
+
   socket.on('disconnect', () => {
     console.log('Usuario desconectado:', socket.id);
     
