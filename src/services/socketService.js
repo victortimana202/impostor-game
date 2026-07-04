@@ -6,25 +6,44 @@ class SocketService {
   constructor() {
     this.socket = null;
     this.roomCode = null;
+    this.lastPlayerName = null; // Guardar para reconexión
   }
 
   connect() {
     if (!this.socket) {
       console.log('🌐 [SocketService] Conectando a servidor...');
       console.log('🌐 [SocketService] URL:', SOCKET_URL);
-      this.socket = io(SOCKET_URL);
+      this.socket = io(SOCKET_URL, {
+        transports: ['websocket', 'polling'], // Intentar websocket primero
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+      });
+      
+      this.socket.on('connect', () => {
+        console.log('✅ [SocketService] Conectado al servidor');
+        console.log('🆔 [SocketService] Socket ID:', this.socket.id);
+        
+        // Si estábamos en una sala, volver a unirse
+        if (this.roomCode && this.lastPlayerName) {
+          console.log('🔄 [SocketService] Reconectando a sala:', this.roomCode);
+          this.socket.emit('join-room', { 
+            roomCode: this.roomCode, 
+            playerName: this.lastPlayerName 
+          });
+        }
+      });
+      
+      this.socket.on('connect_error', (error) => {
+        console.error('❌ [SocketService] Error de conexión:', error);
+      });
+      
+      this.socket.on('disconnect', (reason) => {
+        console.log('⚠️ [SocketService] Desconectado:', reason);
+      });
+      
       return new Promise((resolve) => {
-        this.socket.on('connect', () => {
-          console.log('✅ [SocketService] Conectado al servidor');
-          console.log('🆔 [SocketService] Socket ID:', this.socket.id);
-          resolve();
-        });
-        this.socket.on('connect_error', (error) => {
-          console.error('❌ [SocketService] Error de conexión:', error);
-        });
-        this.socket.on('disconnect', (reason) => {
-          console.log('⚠️ [SocketService] Desconectado:', reason);
-        });
+        this.socket.once('connect', resolve);
       });
     } else {
       console.log('ℹ️ [SocketService] Ya conectado');
@@ -43,6 +62,7 @@ class SocketService {
   createRoom(hostName) {
     const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
     this.roomCode = roomCode;
+    this.lastPlayerName = hostName; // Guardar para reconexión
     
     console.log('🎮 [SocketService] Creando sala...');
     console.log('🎮 [SocketService] RoomCode:', roomCode);
@@ -66,6 +86,7 @@ class SocketService {
 
   joinRoom(roomCode, playerName) {
     this.roomCode = roomCode;
+    this.lastPlayerName = playerName; // Guardar para reconexión
     console.log('🚪 [SocketService] Uniéndose a sala...');
     console.log('🚪 [SocketService] RoomCode:', roomCode);
     console.log('🚪 [SocketService] PlayerName:', playerName);
