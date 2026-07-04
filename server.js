@@ -125,6 +125,19 @@ io.on('connection', (socket) => {
     io.to(targetUserId).emit('voice-ice-candidate', { from: socket.id, candidate });
   });
 
+  // Pictionary Game Events
+  socket.on('pictionary-sync-state', ({ roomCode, gameState }) => {
+    socket.to(roomCode).emit('pictionary-update', { gameState });
+  });
+
+  socket.on('pictionary-guess', ({ roomCode, playerName, guess, correct, timestamp }) => {
+    io.to(roomCode).emit('pictionary-guess', { playerName, guess, correct, timestamp });
+  });
+
+  socket.on('pictionary-drawing', ({ roomCode, x, y, color, lineWidth, isDrawing, tool }) => {
+    socket.to(roomCode).emit('pictionary-drawing', { x, y, color, lineWidth, isDrawing, tool });
+  });
+
   socket.on('disconnect', () => {
     console.log('Usuario desconectado:', socket.id);
     

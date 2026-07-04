@@ -9,10 +9,13 @@ import GameModeSelector from './GameModeSelector';
 import OnlineLobby from './OnlineLobby';
 import VoiceChat from './VoiceChat';
 import DrawingBoard from './DrawingBoard';
+import PictionaryGame from './PictionaryGame';
 import socketService from '../services/socketService';
 
 export default function ImpostorGame() {
   const [gameMode, setGameMode] = useState(null); // null, 'local', 'online'
+  const [gameType, setGameType] = useState('impostor'); // 'impostor' or 'pictionary'
+  const [showPictionary, setShowPictionary] = useState(false);
   const [phase, setPhase] = useState("mode-select");
   const [cfg, setCfg] = useState({
     names: ["Ana", "Carlos", "María", "Luis"],
@@ -129,9 +132,26 @@ export default function ImpostorGame() {
     }
   };
 
+  const handlePictionaryStart = (playerNames, isHost, currentPlayerName) => {
+    setIsOnlineHost(isHost);
+    setGameMode('online');
+    setMyPlayerName(currentPlayerName);
+    
+    const playerList = playerNames.map(name => ({ name }));
+    setPlayers(playerList);
+    setShowPictionary(true);
+  };
+
+  const backFromPictionary = () => {
+    setShowPictionary(false);
+    setPhase('online-lobby');
+  };
+
   const backToModeSelect = () => {
     socketService.disconnect();
     setGameMode(null);
+    setGameType('impostor');
+    setShowPictionary(false);
     setPhase('mode-select');
     setPlayers([]);
     setWord(null);
@@ -360,21 +380,32 @@ export default function ImpostorGame() {
       color: C.text,
       boxSizing: "border-box",
     }}>
-      {phase === "mode-select" && (
-        <GameModeSelector onSelectMode={handleModeSelect} />
-      )}
-
-      {phase === "online-lobby" && (
-        <OnlineLobby 
-          onStartGame={handleOnlineGameStart}
-          onBack={backToModeSelect}
-          setMyPlayerName={setMyPlayerName}
-          cfg={cfg}
-          setCfg={setCfg}
+      {showPictionary ? (
+        <PictionaryGame
+          roomCode={socketService.roomCode}
+          players={players}
+          onBack={backFromPictionary}
+          isHost={isOnlineHost}
+          myPlayerName={myPlayerName}
         />
-      )}
-      
-      {phase === "setup" && <Setup cfg={cfg} setCfg={setCfg} onStart={startGame} />}
+      ) : (
+        <>
+          {phase === "mode-select" && (
+            <GameModeSelector onSelectMode={handleModeSelect} />
+          )}
+
+          {phase === "online-lobby" && (
+            <OnlineLobby 
+              onStartGame={handleOnlineGameStart}
+              onStartPictionary={handlePictionaryStart}
+              onBack={backToModeSelect}
+              setMyPlayerName={setMyPlayerName}
+              cfg={cfg}
+              setCfg={setCfg}
+            />
+          )}
+          
+          {phase === "setup" && <Setup cfg={cfg} setCfg={setCfg} onStart={startGame} />}
       
       {phase === "loading" && (
         <div style={{ ...card({ maxWidth: "380px", width: "100%", textAlign: "center", marginTop: "80px" }) }}>
@@ -1064,6 +1095,8 @@ export default function ImpostorGame() {
             )}
           </div>
         </div>
+      )}
+        </>
       )}
       
       {error && (

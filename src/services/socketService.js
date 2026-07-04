@@ -187,6 +187,39 @@ class SocketService {
     }
   }
 
+  // Métodos de Pictionary
+  syncPictionaryState(roomCode, gameState) {
+    this.socket.emit('pictionary-sync-state', { roomCode, gameState });
+  }
+
+  sendPictionaryGuess(roomCode, guessData) {
+    this.socket.emit('pictionary-guess', { roomCode, ...guessData });
+  }
+
+  sendPictionaryDrawing(roomCode, x, y, color, lineWidth, isDrawing, tool) {
+    this.socket.emit('pictionary-drawing', { roomCode, x, y, color, lineWidth, isDrawing, tool });
+  }
+
+  onPictionaryUpdate(callback) {
+    this.socket.on('pictionary-update', callback);
+  }
+
+  onPictionaryGuess(callback) {
+    this.socket.on('pictionary-guess', callback);
+  }
+
+  onPictionaryDrawing(callback) {
+    this.socket.on('pictionary-drawing', callback);
+  }
+
+  offPictionary() {
+    if (this.socket) {
+      this.socket.off('pictionary-update');
+      this.socket.off('pictionary-guess');
+      this.socket.off('pictionary-drawing');
+    }
+  }
+
   offLobby() {
     if (this.socket) {
       this.socket.off('player-joined');

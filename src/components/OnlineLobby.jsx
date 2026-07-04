@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { C, card, btn } from '../styles/theme';
 import socketService from '../services/socketService';
 
-export default function OnlineLobby({ onStartGame, onBack, setMyPlayerName, cfg, setCfg }) {
+export default function OnlineLobby({ onStartGame, onBack, setMyPlayerName, cfg, setCfg, onStartPictionary }) {
   const [mode, setMode] = useState(null); // 'create' or 'join'
+  const [gameType, setGameType] = useState('impostor'); // 'impostor' or 'pictionary'
   const [playerName, setPlayerName] = useState('');
   const [roomCode, setRoomCode] = useState('');
   const [currentRoom, setCurrentRoom] = useState(null);
@@ -89,7 +90,11 @@ export default function OnlineLobby({ onStartGame, onBack, setMyPlayerName, cfg,
 
   const handleStartGame = () => {
     const playerNames = players.map(p => p.name);
-    onStartGame(playerNames, true, playerName); // Pasar también el nombre del jugador actual
+    if (gameType === 'pictionary') {
+      onStartPictionary(playerNames, true, playerName);
+    } else {
+      onStartGame(playerNames, true, playerName);
+    }
   };
 
   const copyRoomCode = () => {
@@ -253,26 +258,80 @@ export default function OnlineLobby({ onStartGame, onBack, setMyPlayerName, cfg,
           </h3>
           
           <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            {/* Tema del Juego */}
+            {/* Tipo de Juego */}
             <div>
               <label style={{ fontSize: "12px", color: C.muted, display: "block", marginBottom: "8px" }}>
-                Tema del Juego
+                🎮 Tipo de Juego
               </label>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
-                {[
-                  ["general", "🌐 Cultura General"],
-                  ["soccer", "⚽ Fútbol & Deportes"],
-                  ["movies", "🎬 Cine & Series"],
-                  ["anime", "🎮 Geek & Anime"]
-                ].map(([v, lbl]) => (
-                  <button
-                    key={v}
-                    onClick={() => updateConfig(c => ({ ...c, theme: v }))}
-                    style={{
-                      padding: "8px 4px",
-                      borderRadius: "10px",
-                      border: "1px solid",
-                      borderColor: cfg.theme === v || (!cfg.theme && v === 'general') ? C.purple : C.border,
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                <button
+                  onClick={() => setGameType('impostor')}
+                  style={{
+                    padding: "12px 8px",
+                    borderRadius: "10px",
+                    border: "1px solid",
+                    borderColor: gameType === 'impostor' ? C.purple : C.border,
+                    background: gameType === 'impostor' ? C.purpleDim : "transparent",
+                    color: gameType === 'impostor' ? "#c4b5fd" : C.muted,
+                    cursor: "pointer",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: "4px"
+                  }}
+                >
+                  <span style={{ fontSize: "24px" }}>🎭</span>
+                  <span>El Impostor</span>
+                  <span style={{ fontSize: "10px", opacity: 0.7 }}>Adivina quién miente</span>
+                </button>
+                <button
+                  onClick={() => setGameType('pictionary')}
+                  style={{
+                    padding: "12px 8px",
+                    borderRadius: "10px",
+                    border: "1px solid",
+                    borderColor: gameType === 'pictionary' ? C.green : C.border,
+                    background: gameType === 'pictionary' ? C.greenDim : "transparent",
+                    color: gameType === 'pictionary' ? "#86efac" : C.muted,
+                    cursor: "pointer",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: "4px"
+                  }}
+                >
+                  <span style={{ fontSize: "24px" }}>🎨</span>
+                  <span>Dibuja y Adivina</span>
+                  <span style={{ fontSize: "10px", opacity: 0.7 }}>Estilo Pictionary</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Tema del Juego - Solo para Impostor */}
+            {gameType === 'impostor' && (
+              <div>
+                <label style={{ fontSize: "12px", color: C.muted, display: "block", marginBottom: "8px" }}>
+                  Tema del Juego
+                </label>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+                  {[
+                    ["general", "🌐 Cultura General"],
+                    ["soccer", "⚽ Fútbol & Deportes"],
+                    ["movies", "🎬 Cine & Series"],
+                    ["anime", "🎮 Geek & Anime"]
+                  ].map(([v, lbl]) => (
+                    <button
+                      key={v}
+                      onClick={() => updateConfig(c => ({ ...c, theme: v }))}
+                      style={{
+                        padding: "8px 4px",
+                        borderRadius: "10px",
+                        border: "1px solid",
+                        borderColor: cfg.theme === v || (!cfg.theme && v === 'general') ? C.purple : C.border,
                       background: cfg.theme === v || (!cfg.theme && v === 'general') ? C.purpleDim : "transparent",
                       color: cfg.theme === v || (!cfg.theme && v === 'general') ? "#c4b5fd" : C.muted,
                       cursor: "pointer",
@@ -285,8 +344,10 @@ export default function OnlineLobby({ onStartGame, onBack, setMyPlayerName, cfg,
                 ))}
               </div>
             </div>
+            )}
 
-            {/* Impostores */}
+            {/* Impostores - Solo para Impostor */}
+            {gameType === 'impostor' && (
             <div>
               <div style={{ display: "flex", justifySelf: "stretch", justifyContent: "space-between", marginBottom: "6px" }}>
                 <label style={{ fontSize: "12px", color: C.muted }}>Impostores</label>
@@ -301,8 +362,10 @@ export default function OnlineLobby({ onStartGame, onBack, setMyPlayerName, cfg,
                 style={{ width: "100%", accentColor: C.red }}
               />
             </div>
+            )}
 
-            {/* Tiempo */}
+            {/* Tiempo - Solo para Impostor */}
+            {gameType === 'impostor' && (
             <div>
               <div style={{ display: "flex", justifySelf: "stretch", justifyContent: "space-between", marginBottom: "6px" }}>
                 <label style={{ fontSize: "12px", color: C.muted }}>Tiempo de Discusión</label>
@@ -318,8 +381,10 @@ export default function OnlineLobby({ onStartGame, onBack, setMyPlayerName, cfg,
                 style={{ width: "100%", accentColor: C.blue }}
               />
             </div>
+            )}
 
-            {/* Dificultad */}
+            {/* Dificultad - Solo para Impostor */}
+            {gameType === 'impostor' && (
             <div>
               <label style={{ fontSize: "12px", color: C.muted, display: "block", marginBottom: "8px" }}>
                 Dificultad
@@ -351,8 +416,10 @@ export default function OnlineLobby({ onStartGame, onBack, setMyPlayerName, cfg,
                 ))}
               </div>
             </div>
+            )}
 
-            {/* Pistas */}
+            {/* Pistas - Solo para Impostor */}
+            {gameType === 'impostor' && (
             <div>
               <label style={{ fontSize: "12px", color: C.muted, display: "block", marginBottom: "8px" }}>
                 Pista del Impostor
@@ -383,6 +450,7 @@ export default function OnlineLobby({ onStartGame, onBack, setMyPlayerName, cfg,
                 ))}
               </div>
             </div>
+            )}
           </div>
         </div>
       )}
