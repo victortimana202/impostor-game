@@ -4,16 +4,33 @@ Juego completo tipo impostor con preguntas de cultura general generadas por IA u
 
 ## 🎮 Modos de Juego
 
-### 📱 Mismo Dispositivo (Local)
+### 🎭 Modo Impostor (Clásico)
+
+#### 📱 Mismo Dispositivo (Local)
 - Todos juegan desde el mismo teléfono/computadora
 - Perfecto para reuniones presenciales
 - Pasan el dispositivo de mano en mano
 
-### 🌐 En Línea (Multijugador)
+#### 🌐 En Línea (Multijugador)
 - Cada jugador desde su propio dispositivo
 - Juega desde diferentes lugares
 - Ideal para videollamadas o a distancia
 - Crea una sala y comparte el código
+- **Incluye**:
+  - 🎤 Chat de voz WebRTC
+  - ✏️ Pizarra de dibujo colaborativa para discusiones
+
+### 🎨 Modo Pictionary (Dibuja y Adivina) - NUEVO
+
+**Solo disponible en modo En Línea**
+
+- **Todos dibujan simultáneamente** en sus propios dispositivos
+- **Todos ven todos los dibujos** en tiempo real
+- Primer jugador en adivinar la palabra gana puntos
+- 5 rondas de 40 segundos cada una
+- Puntos basados en velocidad (más rápido = más puntos)
+- Canvas profesional con 18 colores y herramientas
+- Sistema de puntuación: 100-400 puntos por ronda
 
 ## 🚀 Instalación
 
@@ -38,6 +55,8 @@ npm run dev:full
 
 ## 📖 Cómo jugar
 
+### 🎭 Modo Impostor
+
 1. **Selecciona el modo**: Mismo dispositivo o En línea
 2. **Configura**: Jugadores, impostores, tiempo, dificultad, pista
 3. **Revelar roles**: Cada jugador ve su rol en privado
@@ -45,10 +64,25 @@ npm run dev:full
 5. **Votar**: Elimina a quien crees que es el impostor
 6. **Ganar**: Ciudadanos eliminan al impostor, o impostor sobrevive
 
-## 🎯 Objetivo
-
+**🎯 Objetivo:**
 - **Ciudadanos**: Todos tienen LA MISMA palabra - identificar al impostor
 - **Impostor**: No tiene palabra (o recibe pista confusa) - actuar como ciudadano
+
+### 🎨 Modo Pictionary
+
+1. **Crea una sala en línea** y selecciona "Dibuja y Adivina"
+2. **Espera a que todos se unan** (mínimo 2 jugadores)
+3. **Ronda comienza**: Todos ven la palabra oculta (solo guiones)
+4. **TODOS dibujan** intentando representar la palabra
+5. **TODOS ven** los dibujos de todos en tiempo real
+6. **Adivina escribiendo** la respuesta en el campo de texto
+7. **Primer en acertar** gana puntos basados en tiempo restante
+8. **5 rondas totales** - Jugador con más puntos gana
+
+**🎯 Objetivo:**
+- Ser el primero en adivinar la palabra secreta
+- Ganar más puntos adivinando rápido
+- Acumular más puntos al final de 5 rondas
 
 ## ⚙️ Configuración Disponible
 

@@ -200,6 +200,10 @@ class SocketService {
     this.socket.emit('pictionary-drawing', { roomCode, x, y, color, lineWidth, isDrawing, tool });
   }
 
+  clearPictionaryCanvas(roomCode) {
+    this.socket.emit('pictionary-clear-canvas', { roomCode });
+  }
+
   onPictionaryUpdate(callback) {
     this.socket.on('pictionary-update', callback);
   }
@@ -212,11 +216,16 @@ class SocketService {
     this.socket.on('pictionary-drawing', callback);
   }
 
+  onPictionaryClear(callback) {
+    this.socket.on('pictionary-clear-canvas', callback);
+  }
+
   offPictionary() {
     if (this.socket) {
       this.socket.off('pictionary-update');
       this.socket.off('pictionary-guess');
       this.socket.off('pictionary-drawing');
+      this.socket.off('pictionary-clear-canvas');
     }
   }
 

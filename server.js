@@ -138,6 +138,10 @@ io.on('connection', (socket) => {
     socket.to(roomCode).emit('pictionary-drawing', { x, y, color, lineWidth, isDrawing, tool });
   });
 
+  socket.on('pictionary-clear-canvas', ({ roomCode }) => {
+    io.to(roomCode).emit('pictionary-clear-canvas');
+  });
+
   socket.on('disconnect', () => {
     console.log('Usuario desconectado:', socket.id);
     

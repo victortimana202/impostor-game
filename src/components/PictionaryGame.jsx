@@ -4,18 +4,17 @@ import { C, card, btn } from '../styles/theme';
 import socketService from '../services/socketService';
 
 export default function PictionaryGame({ roomCode, players: initialPlayers, onBack, isHost, myPlayerName }) {
-  const [currentDrawer, setCurrentDrawer] = useState(0);
   const [word, setWord] = useState(null);
-  const [round, setRound] = useState(1);
   const [timeLeft, setTimeLeft] = useState(40);
-  const [phase, setPhase] = useState('waiting'); // waiting, drawing, results, gameover
-  const [guesses, setGuesses] = useState([]);
+  const [phase, setPhase] = useState('waiting'); // waiting, playing, results, gameover
   const [myGuess, setMyGuess] = useState('');
-  const [attempts, setAttempts] = useState({});
   const [scores, setScores] = useState({});
-  const [guessedCorrectly, setGuessedCorrectly] = useState(new Set());
+  const [roundWinner, setRoundWinner] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [roundNumber, setRoundNumber] = useState(1);
+  const [totalRounds, setTotalRounds] = useState(5);
 
+  // Canvas states
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [color, setColor] = useState('#ffffff');
@@ -26,22 +25,16 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
     '#ffffff', '#000000', '#ff0000', '#00ff00', '#0000ff',
     '#ffff00', '#ff00ff', '#00ffff', '#ffa500', '#800080',
     '#ffc0cb', '#a52a2a', '#808080', '#90ee90', '#ffd700',
-    '#ff69b4'
+    '#ff69b4', '#4169e1', '#32cd32'
   ];
 
-  const totalRounds = initialPlayers.length;
-  const maxAttempts = 3;
-
   useEffect(() => {
-    // Inicializar puntuaciones e intentos
+    // Inicializar puntuaciones
     const initScores = {};
-    const initAttempts = {};
     initialPlayers.forEach(p => {
       initScores[p.name] = 0;
-      initAttempts[p.name] = maxAttempts;
     });
     setScores(initScores);
-    setAttempts(initAttempts);
 
     if (isHost) {
       startNewRound();
@@ -51,6 +44,7 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
     socketService.onPictionaryUpdate(handleGameUpdate);
     socketService.onPictionaryGuess(handleGuessReceived);
     socketService.onPictionaryDrawing(handleDrawingReceived);
+    socketService.onPictionaryClear(handleCanvasClear);
 
     return () => {
       socketService.offPictionary();
@@ -58,17 +52,18 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
   }, []);
 
   useEffect(() => {
-    if (phase === 'drawing' && timeLeft > 0) {
+    if (phase === 'playing' && timeLeft > 0) {
       const timer = setTimeout(() => {
-        setTimeLeft(t => t - 1);
+        const newTime = timeLeft - 1;
+        setTimeLeft(newTime);
         if (isHost) {
-          socketService.syncPictionaryState(roomCode, { timeLeft: timeLeft - 1 });
+          socketService.syncPictionaryState(roomCode, { timeLeft: newTime });
         }
       }, 1000);
       return () => clearTimeout(timer);
-    } else if (phase === 'drawing' && timeLeft === 0) {
+    } else if (phase === 'playing' && timeLeft === 0) {
       if (isHost) {
-        endRound();
+        endRound(null); // Nadie ganó
       }
     }
   }, [phase, timeLeft, isHost]);
@@ -81,30 +76,20 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
       const data = await fetchWord('mixed', false, 'general');
       setWord(data);
       setTimeLeft(40);
-      setGuesses([]);
       setMyGuess('');
-      setGuessedCorrectly(new Set());
-      
-      // Reset intentos
-      const newAttempts = {};
-      initialPlayers.forEach(p => {
-        newAttempts[p.name] = maxAttempts;
-      });
-      setAttempts(newAttempts);
+      setRoundWinner(null);
 
       if (isHost) {
         socketService.syncPictionaryState(roomCode, {
-          phase: 'drawing',
+          phase: 'playing',
           word: data,
-          currentDrawer,
-          round,
           timeLeft: 40,
-          guesses: [],
-          attempts: newAttempts
+          roundNumber,
+          roundWinner: null
         });
       }
 
-      setPhase('drawing');
+      setPhase('playing');
       clearCanvas();
     } catch (e) {
       console.error('Error al obtener palabra:', e);
@@ -113,24 +98,37 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
     }
   };
 
-  const endRound = () => {
+  const endRound = (winner) => {
     setPhase('results');
-    
+    setRoundWinner(winner);
+
+    let newScores = { ...scores };
+    if (winner) {
+      // Puntos basados en tiempo restante
+      const points = Math.max(100, timeLeft * 10);
+      newScores[winner] = (newScores[winner] || 0) + points;
+      setScores(newScores);
+    }
+
     if (isHost) {
       socketService.syncPictionaryState(roomCode, {
         phase: 'results',
-        scores
+        roundWinner: winner,
+        scores: newScores,
+        roundNumber
       });
-      
+
       setTimeout(() => {
-        if (currentDrawer + 1 >= initialPlayers.length) {
+        if (roundNumber >= totalRounds) {
           // Fin del juego
           setPhase('gameover');
-          socketService.syncPictionaryState(roomCode, { phase: 'gameover', scores });
+          socketService.syncPictionaryState(roomCode, { 
+            phase: 'gameover', 
+            scores: newScores 
+          });
         } else {
           // Siguiente ronda
-          setCurrentDrawer(currentDrawer + 1);
-          setRound(round + 1);
+          setRoundNumber(roundNumber + 1);
           startNewRound();
         }
       }, 5000);
@@ -138,74 +136,50 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
   };
 
   const submitGuess = () => {
-    if (!myGuess.trim() || phase !== 'drawing') return;
-    if (initialPlayers[currentDrawer].name === myPlayerName) return;
-    if (guessedCorrectly.has(myPlayerName)) return;
-    if (attempts[myPlayerName] <= 0) return;
+    if (!myGuess.trim() || phase !== 'playing' || roundWinner) return;
 
     const guess = myGuess.trim().toLowerCase();
     const correct = guess === word.word.toLowerCase();
 
-    const guessData = {
-      playerName: myPlayerName,
-      guess: myGuess.trim(),
-      correct,
-      timestamp: Date.now()
-    };
-
-    setGuesses(prev => [...prev, guessData]);
-    setMyGuess('');
-
     if (correct) {
-      // Acierto!
-      const pointsEarned = Math.ceil(timeLeft / 10) * 100;
-      setScores(prev => ({
-        ...prev,
-        [myPlayerName]: prev[myPlayerName] + pointsEarned,
-        [initialPlayers[currentDrawer].name]: prev[initialPlayers[currentDrawer].name] + 50
-      }));
-      setGuessedCorrectly(prev => new Set(prev).add(myPlayerName));
-    } else {
-      // Fallo
-      setAttempts(prev => ({
-        ...prev,
-        [myPlayerName]: prev[myPlayerName] - 1
-      }));
-    }
-
-    socketService.sendPictionaryGuess(roomCode, guessData);
-
-    if (isHost && correct) {
-      socketService.syncPictionaryState(roomCode, { 
-        scores,
-        guessedCorrectly: Array.from(guessedCorrectly)
+      // ¡Acierto!
+      setRoundWinner(myPlayerName);
+      socketService.sendPictionaryGuess(roomCode, {
+        playerName: myPlayerName,
+        guess: myGuess.trim(),
+        correct: true,
+        timestamp: Date.now()
       });
+
+      if (isHost) {
+        endRound(myPlayerName);
+      }
     }
+
+    setMyGuess('');
   };
 
   const handleGameUpdate = ({ gameState }) => {
     if (gameState.phase !== undefined) setPhase(gameState.phase);
     if (gameState.word !== undefined) setWord(gameState.word);
-    if (gameState.currentDrawer !== undefined) setCurrentDrawer(gameState.currentDrawer);
-    if (gameState.round !== undefined) setRound(gameState.round);
     if (gameState.timeLeft !== undefined) setTimeLeft(gameState.timeLeft);
     if (gameState.scores !== undefined) setScores(gameState.scores);
-    if (gameState.attempts !== undefined) setAttempts(gameState.attempts);
-    if (gameState.guessedCorrectly !== undefined) {
-      setGuessedCorrectly(new Set(gameState.guessedCorrectly));
-    }
+    if (gameState.roundWinner !== undefined) setRoundWinner(gameState.roundWinner);
+    if (gameState.roundNumber !== undefined) setRoundNumber(gameState.roundNumber);
   };
 
   const handleGuessReceived = (guessData) => {
-    setGuesses(prev => [...prev, guessData]);
-    
-    if (guessData.correct) {
-      setGuessedCorrectly(prev => new Set(prev).add(guessData.playerName));
+    if (guessData.correct && !roundWinner) {
+      setRoundWinner(guessData.playerName);
     }
   };
 
   const handleDrawingReceived = ({ x, y, color, lineWidth, isDrawing, tool }) => {
     drawLine(x, y, color, lineWidth, isDrawing, tool);
+  };
+
+  const handleCanvasClear = () => {
+    clearCanvas();
   };
 
   // Funciones de dibujo
@@ -236,8 +210,6 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
   };
 
   const startDrawing = (e) => {
-    if (initialPlayers[currentDrawer].name !== myPlayerName) return;
-    
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
     const x = ((e.clientX || e.touches?.[0]?.clientX) - rect.left) * (canvas.width / rect.width);
@@ -249,7 +221,7 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
   };
 
   const draw = (e) => {
-    if (!isDrawing || initialPlayers[currentDrawer].name !== myPlayerName) return;
+    if (!isDrawing) return;
     e.preventDefault();
 
     const canvas = canvasRef.current;
@@ -273,8 +245,10 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   };
 
-  const isMyTurnToDraw = initialPlayers[currentDrawer]?.name === myPlayerName;
-  const haveIGuessed = guessedCorrectly.has(myPlayerName);
+  const handleClearCanvas = () => {
+    clearCanvas();
+    socketService.clearPictionaryCanvas(roomCode);
+  };
 
   return (
     <div style={{
@@ -286,37 +260,24 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
       padding: '24px 16px',
       color: C.text
     }}>
-      <div style={{ maxWidth: '900px', width: '100%' }}>
+      <div style={{ maxWidth: '1000px', width: '100%' }}>
         {/* Header */}
         <div style={{ 
           ...card({ marginBottom: '16px', textAlign: 'center' }),
-          background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(59,130,246,0.2))'
+          background: 'linear-gradient(135deg, rgba(34,197,94,0.2), rgba(59,130,246,0.2))'
         }}>
           <h1 style={{ fontSize: '32px', margin: '0 0 8px', fontWeight: '900' }}>
-            🎨 Dibuja y Adivina
+            🎨 Dibuja y Adivina - Todos Juegan
           </h1>
           <div style={{ fontSize: '16px', color: C.muted }}>
-            Ronda {round} de {totalRounds}
+            Ronda {roundNumber} de {totalRounds} • Todos dibujan, el primero en adivinar gana
           </div>
         </div>
 
-        {phase === 'drawing' && (
+        {phase === 'playing' && word && (
           <>
-            {/* Información de turno y tiempo */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-              <div style={{ 
-                ...card({ padding: '16px', textAlign: 'center' }),
-                background: isMyTurnToDraw ? C.purpleDim : C.blueDim,
-                borderColor: isMyTurnToDraw ? C.purpleBorder : 'rgba(59,130,246,0.35)'
-              }}>
-                <div style={{ fontSize: '14px', color: C.muted, marginBottom: '6px' }}>
-                  {isMyTurnToDraw ? '🎨 TU TURNO' : '👀 DIBUJANDO'}
-                </div>
-                <div style={{ fontSize: '20px', fontWeight: '800' }}>
-                  {initialPlayers[currentDrawer]?.name}
-                </div>
-              </div>
-
+            {/* Información de tiempo y palabra */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', marginBottom: '16px', alignItems: 'center' }}>
               <div style={{ 
                 ...card({ padding: '16px', textAlign: 'center' }),
                 background: timeLeft < 10 ? C.redDim : C.goldDim,
@@ -326,42 +287,82 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
                   ⏱️ TIEMPO
                 </div>
                 <div style={{ 
-                  fontSize: '28px', 
+                  fontSize: '32px', 
                   fontWeight: '900',
                   color: timeLeft < 10 ? '#fca5a5' : '#fcd34d'
                 }}>
                   {timeLeft}s
                 </div>
               </div>
-            </div>
 
-            {/* Palabra para el dibujante */}
-            {isMyTurnToDraw && word && (
               <div style={{ 
-                ...card({ marginBottom: '16px', textAlign: 'center' }),
-                background: C.greenDim,
-                borderColor: C.greenBorder
+                ...card({ padding: '20px', textAlign: 'center' }),
+                background: roundWinner ? C.greenDim : C.purpleDim,
+                borderColor: roundWinner ? C.greenBorder : C.purpleBorder,
+                minWidth: '300px'
               }}>
-                <div style={{ fontSize: '13px', color: C.muted, marginBottom: '8px' }}>
-                  🎯 TU PALABRA SECRETA
+                {roundWinner ? (
+                  <>
+                    <div style={{ fontSize: '16px', color: C.green, marginBottom: '6px', fontWeight: '700' }}>
+                      🏆 ¡{roundWinner} GANÓ!
+                    </div>
+                    <div style={{ fontSize: '24px', fontWeight: '900', color: '#86efac' }}>
+                      {word.emoji} {word.word}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontSize: '13px', color: C.muted, marginBottom: '6px' }}>
+                      🎯 PALABRA SECRETA
+                    </div>
+                    <div style={{ fontSize: '28px', fontWeight: '900', color: '#c4b5fd' }}>
+                      {word.emoji} {"_ ".repeat(word.word.length)}
+                    </div>
+                    <div style={{ fontSize: '12px', color: C.hint, marginTop: '4px' }}>
+                      {word.category} • {word.word.length} letras
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div style={{ 
+                ...card({ padding: '16px', textAlign: 'center' }),
+                background: C.blueDim,
+                borderColor: 'rgba(59,130,246,0.35)'
+              }}>
+                <div style={{ fontSize: '14px', color: C.muted, marginBottom: '6px' }}>
+                  👤 TÚ
                 </div>
-                <div style={{ fontSize: '32px', fontWeight: '900', color: '#86efac' }}>
-                  {word.emoji} {word.word}
+                <div style={{ fontSize: '20px', fontWeight: '800' }}>
+                  {myPlayerName}
                 </div>
-                <div style={{ fontSize: '14px', color: C.muted, marginTop: '6px' }}>
-                  {word.category}
+                <div style={{ fontSize: '16px', color: C.gold, fontWeight: '700' }}>
+                  {scores[myPlayerName] || 0} pts
                 </div>
               </div>
-            )}
+            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
-              {/* Canvas de dibujo */}
+            <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '16px' }}>
+              {/* Canvas de dibujo - TODOS PUEDEN DIBUJAR */}
               <div>
                 <div style={{ ...card({ padding: '16px' }) }}>
+                  <div style={{ 
+                    marginBottom: '12px',
+                    padding: '10px',
+                    background: 'rgba(34,197,94,0.1)',
+                    borderRadius: '8px',
+                    textAlign: 'center',
+                    fontSize: '13px',
+                    color: '#86efac',
+                    fontWeight: '700'
+                  }}>
+                    🎨 ¡TODOS PUEDEN DIBUJAR! Ayuda a adivinar la palabra
+                  </div>
+
                   <canvas
                     ref={canvasRef}
-                    width={600}
-                    height={450}
+                    width={700}
+                    height={500}
                     onMouseDown={startDrawing}
                     onMouseMove={draw}
                     onMouseUp={stopDrawing}
@@ -373,220 +374,208 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
                       width: '100%',
                       height: 'auto',
                       borderRadius: '12px',
-                      cursor: isMyTurnToDraw ? 'crosshair' : 'not-allowed',
+                      cursor: 'crosshair',
                       background: '#1a1a2e',
                       border: `3px solid ${C.border}`,
-                      touchAction: 'none'
+                      touchAction: 'none',
+                      marginBottom: '12px'
                     }}
                   />
 
-                  {isMyTurnToDraw && (
-                    <div style={{ marginTop: '12px' }}>
-                      {/* Herramientas */}
-                      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                        <button
-                          onClick={() => setTool('pen')}
-                          style={{
-                            ...btn(tool === 'pen' ? 'primary' : 'ghost', { flex: 1, padding: '10px' })
-                          }}
-                        >
-                          ✏️ Lápiz
-                        </button>
-                        <button
-                          onClick={() => setTool('eraser')}
-                          style={{
-                            ...btn(tool === 'eraser' ? 'danger' : 'ghost', { flex: 1, padding: '10px' })
-                          }}
-                        >
-                          🧹 Borrador
-                        </button>
-                        <button
-                          onClick={clearCanvas}
-                          style={btn('ghost', { padding: '10px' })}
-                        >
-                          🗑️
-                        </button>
-                      </div>
-
-                      {/* Colores */}
-                      <div style={{ 
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(8, 1fr)',
-                        gap: '6px',
-                        marginBottom: '12px'
-                      }}>
-                        {colors.map(c => (
-                          <button
-                            key={c}
-                            onClick={() => { setColor(c); setTool('pen'); }}
-                            style={{
-                              width: '100%',
-                              aspectRatio: '1',
-                              borderRadius: '8px',
-                              background: c,
-                              border: color === c ? `3px solid ${C.green}` : `1px solid ${C.border}`,
-                              cursor: 'pointer'
-                            }}
-                          />
-                        ))}
-                      </div>
-
-                      {/* Grosor */}
-                      <div>
-                        <div style={{ 
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          fontSize: '12px',
-                          marginBottom: '6px'
-                        }}>
-                          <span style={{ color: C.muted }}>Grosor</span>
-                          <span style={{ fontWeight: '700' }}>{lineWidth}px</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="1"
-                          max="20"
-                          value={lineWidth}
-                          onChange={(e) => setLineWidth(parseInt(e.target.value))}
-                          style={{ width: '100%', accentColor: C.purple }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Chat de adivinanzas */}
-              <div>
-                <div style={{ ...card({ padding: '16px', height: '100%', display: 'flex', flexDirection: 'column' }) }}>
-                  <h3 style={{ margin: '0 0 12px', fontSize: '16px' }}>
-                    💬 Adivinanzas
-                  </h3>
-
-                  <div style={{ 
-                    flex: 1,
-                    overflowY: 'auto',
-                    marginBottom: '12px',
-                    padding: '8px',
-                    background: 'rgba(0,0,0,0.2)',
-                    borderRadius: '8px',
-                    border: `1px solid ${C.border}`
-                  }}>
-                    {guesses.map((g, idx) => (
-                      <div
-                        key={idx}
+                  {/* Herramientas de dibujo */}
+                  <div style={{ marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                      <button
+                        onClick={() => setTool('pen')}
                         style={{
-                          padding: '8px',
-                          marginBottom: '6px',
-                          borderRadius: '6px',
-                          background: g.correct ? C.greenDim : 'rgba(255,255,255,0.05)',
-                          border: `1px solid ${g.correct ? C.greenBorder : C.border}`
+                          ...btn(tool === 'pen' ? 'primary' : 'ghost', { 
+                            flex: 1, 
+                            padding: '10px',
+                            fontSize: '14px'
+                          })
                         }}
                       >
-                        <div style={{ fontSize: '11px', color: C.muted }}>
-                          {g.playerName}
-                        </div>
-                        <div style={{ 
-                          fontSize: '14px',
-                          fontWeight: g.correct ? '700' : '400',
-                          color: g.correct ? '#86efac' : C.text
-                        }}>
-                          {g.correct ? '✅ ¡Correcto!' : g.guess}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {!isMyTurnToDraw && (
-                    <>
-                      <div style={{ 
-                        fontSize: '12px',
-                        color: haveIGuessed ? C.green : C.muted,
-                        marginBottom: '8px',
-                        fontWeight: '700'
-                      }}>
-                        {haveIGuessed 
-                          ? '✅ ¡Ya adivinaste!'
-                          : `Intentos restantes: ${attempts[myPlayerName] || 0}`
-                        }
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <input
-                          type="text"
-                          value={myGuess}
-                          onChange={(e) => setMyGuess(e.target.value)}
-                          onKeyPress={(e) => e.key === 'Enter' && submitGuess()}
-                          placeholder="Escribe tu respuesta..."
-                          disabled={haveIGuessed || attempts[myPlayerName] <= 0}
-                          style={{
-                            flex: 1,
+                        ✏️ Lápiz
+                      </button>
+                      <button
+                        onClick={() => setTool('eraser')}
+                        style={{
+                          ...btn(tool === 'eraser' ? 'danger' : 'ghost', { 
+                            flex: 1, 
                             padding: '10px',
+                            fontSize: '14px'
+                          })
+                        }}
+                      >
+                        🧹 Borrador
+                      </button>
+                      <button
+                        onClick={handleClearCanvas}
+                        style={btn('ghost', { padding: '10px 16px', fontSize: '14px' })}
+                      >
+                        🗑️ Limpiar
+                      </button>
+                    </div>
+
+                    {/* Colores */}
+                    <div style={{ 
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(9, 1fr)',
+                      gap: '6px',
+                      marginBottom: '12px'
+                    }}>
+                      {colors.map(c => (
+                        <button
+                          key={c}
+                          onClick={() => { setColor(c); setTool('pen'); }}
+                          style={{
+                            width: '100%',
+                            aspectRatio: '1',
                             borderRadius: '8px',
-                            border: `1px solid ${C.border}`,
-                            background: 'rgba(255,255,255,0.06)',
-                            color: C.text,
-                            fontSize: '14px',
-                            outline: 'none'
+                            background: c,
+                            border: color === c ? `3px solid ${C.green}` : `1px solid ${C.border}`,
+                            cursor: 'pointer',
+                            transform: color === c ? 'scale(1.1)' : 'scale(1)',
+                            transition: 'all 0.2s'
                           }}
                         />
-                        <button
-                          onClick={submitGuess}
-                          disabled={!myGuess.trim() || haveIGuessed || attempts[myPlayerName] <= 0}
-                          style={{
-                            ...btn('primary', { padding: '10px 16px' }),
-                            opacity: (!myGuess.trim() || haveIGuessed || attempts[myPlayerName] <= 0) ? 0.5 : 1
-                          }}
-                        >
-                          📤
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
+                      ))}
+                    </div>
 
-            {/* Tabla de puntuaciones */}
-            <div style={{ ...card({ marginTop: '16px', padding: '16px' }) }}>
-              <h3 style={{ margin: '0 0 12px', fontSize: '16px' }}>
-                🏆 Puntuaciones
-              </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px' }}>
-                {initialPlayers.map((p, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      padding: '10px',
-                      borderRadius: '8px',
-                      background: p.name === initialPlayers[currentDrawer]?.name ? C.purpleDim : C.surface,
-                      border: `1px solid ${p.name === initialPlayers[currentDrawer]?.name ? C.purpleBorder : C.border}`,
-                      textAlign: 'center'
-                    }}
-                  >
-                    <div style={{ fontSize: '13px', fontWeight: '700' }}>{p.name}</div>
-                    <div style={{ fontSize: '20px', color: C.gold, fontWeight: '900' }}>
-                      {scores[p.name] || 0}
+                    {/* Grosor */}
+                    <div>
+                      <div style={{ 
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        fontSize: '12px',
+                        marginBottom: '6px'
+                      }}>
+                        <span style={{ color: C.muted }}>Grosor</span>
+                        <span style={{ fontWeight: '700' }}>{lineWidth}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1"
+                        max="20"
+                        value={lineWidth}
+                        onChange={(e) => setLineWidth(parseInt(e.target.value))}
+                        style={{ width: '100%', accentColor: C.green }}
+                      />
                     </div>
                   </div>
-                ))}
+                </div>
+              </div>
+
+              {/* Panel de adivinanza y puntuaciones */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Adivinar */}
+                {!roundWinner && (
+                  <div style={{ ...card({ padding: '16px' }) }}>
+                    <h3 style={{ margin: '0 0 12px', fontSize: '16px', fontWeight: '700' }}>
+                      🎯 Adivina la Palabra
+                    </h3>
+
+                    <div style={{ 
+                      padding: '12px',
+                      background: 'rgba(139,92,246,0.1)',
+                      borderRadius: '8px',
+                      marginBottom: '12px',
+                      fontSize: '13px',
+                      color: C.muted,
+                      lineHeight: 1.5
+                    }}>
+                      💡 Mira los dibujos de todos y escribe la palabra. ¡El primero en acertar gana puntos!
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input
+                        type="text"
+                        value={myGuess}
+                        onChange={(e) => setMyGuess(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && submitGuess()}
+                        placeholder="Escribe tu respuesta..."
+                        disabled={roundWinner}
+                        style={{
+                          flex: 1,
+                          padding: '12px',
+                          borderRadius: '8px',
+                          border: `1px solid ${C.border}`,
+                          background: 'rgba(255,255,255,0.06)',
+                          color: C.text,
+                          fontSize: '15px',
+                          outline: 'none'
+                        }}
+                      />
+                      <button
+                        onClick={submitGuess}
+                        disabled={!myGuess.trim() || roundWinner}
+                        style={{
+                          ...btn('primary', { padding: '12px 20px', fontSize: '15px' }),
+                          opacity: (!myGuess.trim() || roundWinner) ? 0.5 : 1
+                        }}
+                      >
+                        📤
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {roundWinner && (
+                  <div style={{ 
+                    ...card({ padding: '20px', textAlign: 'center' }),
+                    background: C.greenDim,
+                    borderColor: C.greenBorder
+                  }}>
+                    <div style={{ fontSize: '48px', marginBottom: '12px' }}>🎉</div>
+                    <div style={{ fontSize: '18px', fontWeight: '700', color: '#86efac', marginBottom: '8px' }}>
+                      ¡{roundWinner} GANÓ!
+                    </div>
+                    <div style={{ fontSize: '14px', color: C.muted }}>
+                      +{Math.max(100, timeLeft * 10)} puntos
+                    </div>
+                  </div>
+                )}
+
+                {/* Tabla de puntuaciones */}
+                <div style={{ ...card({ padding: '16px' }) }}>
+                  <h3 style={{ margin: '0 0 12px', fontSize: '16px', fontWeight: '700' }}>
+                    🏆 Puntuaciones
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {Object.entries(scores)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([name, score], idx) => (
+                        <div
+                          key={name}
+                          style={{
+                            padding: '12px',
+                            borderRadius: '10px',
+                            background: name === myPlayerName ? C.purpleDim : idx === 0 ? C.goldDim : C.surface,
+                            border: `1px solid ${name === myPlayerName ? C.purpleBorder : idx === 0 ? C.goldBorder : C.border}`,
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '16px', fontWeight: '700', color: C.muted }}>
+                              {idx + 1}.
+                            </span>
+                            <span style={{ fontSize: '15px', fontWeight: '700' }}>
+                              {name}
+                              {name === roundWinner && ' 👑'}
+                            </span>
+                          </div>
+                          <span style={{ fontSize: '18px', color: C.gold, fontWeight: '900' }}>
+                            {score}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
               </div>
             </div>
           </>
-        )}
-
-        {phase === 'results' && word && (
-          <div style={{ ...card({ textAlign: 'center', padding: '40px' }) }}>
-            <h2 style={{ fontSize: '28px', marginBottom: '16px' }}>
-              La palabra era:
-            </h2>
-            <div style={{ fontSize: '48px', fontWeight: '900', color: C.green, marginBottom: '32px' }}>
-              {word.emoji} {word.word}
-            </div>
-            <div style={{ fontSize: '16px', color: C.muted }}>
-              Siguiente ronda en unos segundos...
-            </div>
-          </div>
         )}
 
         {phase === 'gameover' && (
