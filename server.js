@@ -11,6 +11,15 @@ const io = new Server(httpServer, {
   }
 });
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+app.get('/', (req, res) => {
+  res.status(200).json({ message: 'Impostor Game Server is running', rooms: rooms.size });
+});
+
 const rooms = new Map();
 
 io.on('connection', (socket) => {

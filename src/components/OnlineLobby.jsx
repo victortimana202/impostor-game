@@ -64,7 +64,7 @@ export default function OnlineLobby({ onStartGame, onBack, setMyPlayerName, cfg,
     console.log('🎮 [OnlineLobby] Nombre del host:', playerName.trim());
     
     setConnecting(true);
-    setError(null);
+    setError('⏳ Despertando servidor... Puede tardar hasta 30 segundos si está dormido.');
     
     try {
       const code = await socketService.createRoom(playerName.trim());
@@ -75,11 +75,12 @@ export default function OnlineLobby({ onStartGame, onBack, setMyPlayerName, cfg,
       setIsHost(true);
       setPlayers([{ id: 'me', name: playerName.trim(), ready: false }]);
       setMyPlayerName(playerName.trim());
+      setError(null);
       
       console.log('✅ [OnlineLobby] Estado actualizado - Host listo');
     } catch (e) {
       console.error('❌ [OnlineLobby] Error al crear sala:', e);
-      setError('Error al crear la sala: ' + e.message);
+      setError(e.message || 'Error al crear la sala');
     } finally {
       setConnecting(false);
     }

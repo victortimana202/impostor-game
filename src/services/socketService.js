@@ -52,9 +52,9 @@ class SocketService {
     
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        console.error('❌ [SocketService] Timeout al crear sala');
-        reject(new Error('Timeout al crear sala'));
-      }, 5000);
+        console.error('❌ [SocketService] Timeout al crear sala (servidor puede estar dormido)');
+        reject(new Error('Timeout al crear sala. El servidor puede estar despertando, intenta de nuevo en 10 segundos.'));
+      }, 30000); // Aumentado a 30 segundos para dar tiempo al servidor a despertar
       
       this.socket.once('room-created', () => {
         clearTimeout(timeout);
