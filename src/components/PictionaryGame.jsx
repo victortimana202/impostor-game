@@ -432,7 +432,7 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
           </div>
         )}
 
-        {phase === 'drawing' && myWord ? (
+        {phase === 'drawing' && myWord && (
           <>
             {/* Información de tiempo y palabra */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', marginBottom: '16px', alignItems: 'center' }}>
