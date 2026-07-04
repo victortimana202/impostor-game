@@ -241,11 +241,20 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
 
   const handleGameUpdate = ({ gameState }) => {
     console.log('📥 [PictionaryGame] Actualización de estado recibida:', gameState);
-    if (gameState.phase !== undefined) setPhase(gameState.phase);
+    console.log('📥 [PictionaryGame] Mi nombre de jugador:', myPlayerName);
+    
+    if (gameState.phase !== undefined) {
+      console.log('📥 [PictionaryGame] Cambiando fase a:', gameState.phase);
+      setPhase(gameState.phase);
+    }
+    
     if (gameState.playerWords !== undefined) {
+      console.log('📥 [PictionaryGame] PlayerWords recibidas:', gameState.playerWords);
+      console.log('📥 [PictionaryGame] Mi palabra debería ser:', gameState.playerWords[myPlayerName]);
       setPlayerWords(gameState.playerWords);
       setMyWord(gameState.playerWords[myPlayerName]);
     }
+    
     if (gameState.timeLeft !== undefined) setTimeLeft(gameState.timeLeft);
     if (gameState.scores !== undefined) setScores(gameState.scores);
     if (gameState.roundWinner !== undefined) setRoundWinner(gameState.roundWinner);
@@ -411,7 +420,19 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
           </div>
         )}
 
-        {phase === 'drawing' && myWord && (
+        {phase === 'drawing' && !myWord && (
+          <div style={{ ...card({ padding: '32px', textAlign: 'center' }) }}>
+            <div style={{ fontSize: '52px', marginBottom: '16px', animation: 'spin 2s linear infinite' }}>🎨</div>
+            <h2 style={{ fontSize: '24px', marginBottom: '12px', fontWeight: '800' }}>
+              Cargando tu palabra...
+            </h2>
+            <p style={{ color: C.muted, fontSize: '16px' }}>
+              Esperando sincronización del servidor
+            </p>
+          </div>
+        )}
+
+        {phase === 'drawing' && myWord ? (
           <>
             {/* Información de tiempo y palabra */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', marginBottom: '16px', alignItems: 'center' }}>
