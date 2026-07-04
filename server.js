@@ -14,9 +14,14 @@ const io = new Server(httpServer, {
 const rooms = new Map();
 
 io.on('connection', (socket) => {
-  console.log('Usuario conectado:', socket.id);
+  console.log('✅ [Server] Usuario conectado:', socket.id);
 
   socket.on('create-room', ({ roomCode, hostName }) => {
+    console.log('🎮 [Server] Creando sala...');
+    console.log('🎮 [Server] RoomCode:', roomCode);
+    console.log('🎮 [Server] HostName:', hostName);
+    console.log('🎮 [Server] Socket ID:', socket.id);
+    
     socket.join(roomCode);
     rooms.set(roomCode, {
       host: socket.id,
@@ -24,16 +29,29 @@ io.on('connection', (socket) => {
       gameState: null,
       config: null,
     });
+    
     socket.emit('room-created', { roomCode });
-    console.log(`Sala ${roomCode} creada por ${hostName}`);
+    console.log('✅ [Server] Sala creada:', roomCode);
+    console.log('📊 [Server] Total de salas activas:', rooms.size);
   });
 
   socket.on('join-room', ({ roomCode, playerName }) => {
+    console.log('🚪 [Server] Intento de unión...');
+    console.log('🚪 [Server] RoomCode:', roomCode);
+    console.log('🚪 [Server] PlayerName:', playerName);
+    console.log('🚪 [Server] Socket ID:', socket.id);
+    
     const room = rooms.get(roomCode);
+    
     if (!room) {
+      console.error('❌ [Server] Sala no encontrada:', roomCode);
+      console.log('📊 [Server] Salas disponibles:', Array.from(rooms.keys()));
       socket.emit('error', { message: 'Sala no encontrada' });
       return;
     }
+    
+    console.log('✅ [Server] Sala encontrada');
+    console.log('👥 [Server] Jugadores actuales:', room.players.length);
     
     socket.join(roomCode);
     room.players.push({ id: socket.id, name: playerName, ready: false });
@@ -42,7 +60,9 @@ io.on('connection', (socket) => {
       players: room.players,
       playerName 
     });
-    console.log(`${playerName} se unió a la sala ${roomCode}`);
+    
+    console.log('✅ [Server] Jugador unido exitosamente');
+    console.log('👥 [Server] Nuevos jugadores totales:', room.players.length);
   });
 
   socket.on('player-ready', ({ roomCode }) => {
@@ -160,17 +180,19 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log('Usuario desconectado:', socket.id);
+    console.log('⚠️ [Server] Usuario desconectado:', socket.id);
     
     rooms.forEach((room, roomCode) => {
       const playerIndex = room.players.findIndex(p => p.id === socket.id);
       if (playerIndex !== -1) {
         const playerName = room.players[playerIndex].name;
+        console.log('👋 [Server] Removiendo jugador:', playerName, 'de sala:', roomCode);
         room.players.splice(playerIndex, 1);
         
         if (room.players.length === 0) {
           rooms.delete(roomCode);
-          console.log(`Sala ${roomCode} eliminada`);
+          console.log(`🗑️ [Server] Sala ${roomCode} eliminada (vacía)`);
+          console.log('📊 [Server] Salas activas restantes:', rooms.size);
         } else {
           io.to(roomCode).emit('player-left', { 
             players: room.players,
@@ -179,6 +201,7 @@ io.on('connection', (socket) => {
           
           if (socket.id === room.host && room.players.length > 0) {
             room.host = room.players[0].id;
+            console.log(`👑 [Server] Nuevo host en sala ${roomCode}:`, room.players[0].name);
             io.to(roomCode).emit('new-host', { hostId: room.host });
           }
         }

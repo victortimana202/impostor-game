@@ -10,13 +10,25 @@ class SocketService {
 
   connect() {
     if (!this.socket) {
+      console.log('🌐 [SocketService] Conectando a servidor...');
+      console.log('🌐 [SocketService] URL:', SOCKET_URL);
       this.socket = io(SOCKET_URL);
       return new Promise((resolve) => {
         this.socket.on('connect', () => {
-          console.log('Conectado al servidor');
+          console.log('✅ [SocketService] Conectado al servidor');
+          console.log('🆔 [SocketService] Socket ID:', this.socket.id);
           resolve();
         });
+        this.socket.on('connect_error', (error) => {
+          console.error('❌ [SocketService] Error de conexión:', error);
+        });
+        this.socket.on('disconnect', (reason) => {
+          console.log('⚠️ [SocketService] Desconectado:', reason);
+        });
       });
+    } else {
+      console.log('ℹ️ [SocketService] Ya conectado');
+      return Promise.resolve();
     }
   }
 
@@ -31,9 +43,22 @@ class SocketService {
   createRoom(hostName) {
     const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
     this.roomCode = roomCode;
+    
+    console.log('🎮 [SocketService] Creando sala...');
+    console.log('🎮 [SocketService] RoomCode:', roomCode);
+    console.log('🎮 [SocketService] HostName:', hostName);
+    
     this.socket.emit('create-room', { roomCode, hostName });
-    return new Promise((resolve) => {
+    
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        console.error('❌ [SocketService] Timeout al crear sala');
+        reject(new Error('Timeout al crear sala'));
+      }, 5000);
+      
       this.socket.once('room-created', () => {
+        clearTimeout(timeout);
+        console.log('✅ [SocketService] Sala creada exitosamente');
         resolve(roomCode);
       });
     });
@@ -41,7 +66,12 @@ class SocketService {
 
   joinRoom(roomCode, playerName) {
     this.roomCode = roomCode;
+    console.log('🚪 [SocketService] Uniéndose a sala...');
+    console.log('🚪 [SocketService] RoomCode:', roomCode);
+    console.log('🚪 [SocketService] PlayerName:', playerName);
+    
     this.socket.emit('join-room', { roomCode, playerName });
+    console.log('📤 [SocketService] Evento "join-room" enviado');
   }
 
   onPlayerJoined(callback) {

@@ -20,46 +20,66 @@ export default function OnlineLobby({ onStartGame, onBack, setMyPlayerName, cfg,
   ];
 
   useEffect(() => {
+    console.log('🏠 [OnlineLobby] Inicializando lobby...');
     socketService.connect();
 
-    socketService.onPlayerJoined(({ players, playerName }) => {
+    socketService.onPlayerJoined(({ players, playerName: joinedPlayer }) => {
+      console.log('👋 [OnlineLobby] Jugador unido:', joinedPlayer);
+      console.log('👥 [OnlineLobby] Jugadores totales:', players);
       setPlayers(players);
       setError(null);
     });
 
-    socketService.onPlayerLeft(({ players, playerName }) => {
+    socketService.onPlayerLeft(({ players, playerName: leftPlayer }) => {
+      console.log('👋 [OnlineLobby] Jugador salió:', leftPlayer);
+      console.log('👥 [OnlineLobby] Jugadores restantes:', players);
       setPlayers(players);
     });
 
     socketService.onPlayersUpdate(({ players }) => {
+      console.log('🔄 [OnlineLobby] Actualización de jugadores:', players);
       setPlayers(players);
     });
 
     socketService.onError(({ message }) => {
+      console.error('❌ [OnlineLobby] Error recibido:', message);
       setError(message);
       setConnecting(false);
     });
 
     return () => {
+      console.log('🏠 [OnlineLobby] Limpiando lobby...');
       socketService.offLobby();
     };
   }, []);
 
   const handleCreateRoom = async () => {
     if (!playerName.trim()) {
+      console.warn('⚠️ [OnlineLobby] Nombre vacío al crear sala');
       setError('Ingresa tu nombre');
       return;
     }
+    
+    console.log('🎮 [OnlineLobby] Creando sala...');
+    console.log('🎮 [OnlineLobby] Nombre del host:', playerName.trim());
+    
     setConnecting(true);
     setError(null);
+    
     try {
       const code = await socketService.createRoom(playerName.trim());
+      console.log('✅ [OnlineLobby] Sala creada exitosamente');
+      console.log('🔑 [OnlineLobby] Código de sala:', code);
+      
       setCurrentRoom(code);
       setIsHost(true);
       setPlayers([{ id: 'me', name: playerName.trim(), ready: false }]);
       setMyPlayerName(playerName.trim());
+      
+      console.log('✅ [OnlineLobby] Estado actualizado - Host listo');
     } catch (e) {
-      setError('Error al crear la sala');
+      console.error('❌ [OnlineLobby] Error al crear sala:', e);
+      setError('Error al crear la sala: ' + e.message);
     } finally {
       setConnecting(false);
     }
@@ -67,20 +87,36 @@ export default function OnlineLobby({ onStartGame, onBack, setMyPlayerName, cfg,
 
   const handleJoinRoom = () => {
     if (!playerName.trim()) {
+      console.warn('⚠️ [OnlineLobby] Nombre vacío al unirse');
       setError('Ingresa tu nombre');
       return;
     }
     if (!roomCode.trim()) {
+      console.warn('⚠️ [OnlineLobby] Código vacío al unirse');
       setError('Ingresa el código de sala');
       return;
     }
+    
+    const cleanCode = roomCode.trim().toUpperCase();
+    console.log('🚪 [OnlineLobby] Intentando unirse a sala...');
+    console.log('🚪 [OnlineLobby] Código:', cleanCode);
+    console.log('🚪 [OnlineLobby] Nombre:', playerName.trim());
+    
     setConnecting(true);
     setError(null);
-    socketService.joinRoom(roomCode.trim().toUpperCase(), playerName.trim());
-    setCurrentRoom(roomCode.trim().toUpperCase());
+    
+    socketService.joinRoom(cleanCode, playerName.trim());
+    setCurrentRoom(cleanCode);
     setIsHost(false);
     setMyPlayerName(playerName.trim());
-    setTimeout(() => setConnecting(false), 1000);
+    
+    console.log('⏳ [OnlineLobby] Esperando respuesta del servidor...');
+    
+    // Timeout para detectar si no hay respuesta
+    setTimeout(() => {
+      setConnecting(false);
+      console.log('⏱️ [OnlineLobby] Timeout de conexión alcanzado');
+    }, 3000);
   };
 
   const handleReady = () => {
