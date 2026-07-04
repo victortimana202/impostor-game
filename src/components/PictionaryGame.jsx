@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
-import { fetchWord } from '../services/groqApi';
+import { getRandomWord, getCategories } from '../services/colombianWords';
 import { C, card, btn } from '../styles/theme';
 import socketService from '../services/socketService';
 
 export default function PictionaryGame({ roomCode, players: initialPlayers, onBack, isHost, myPlayerName }) {
-  const [word, setWord] = useState(null);
-  const [timeLeft, setTimeLeft] = useState(40);
-  const [phase, setPhase] = useState('waiting'); // waiting, playing, results, gameover
+  const [playerWords, setPlayerWords] = useState({}); // Cada jugador tiene su propia palabra
+  const [myWord, setMyWord] = useState(null); // Mi palabra personal
+  const [timeLeft, setTimeLeft] = useState(60); // 1 minuto para dibujar
+  const [phase, setPhase] = useState('category-select'); // category-select, waiting, drawing, discussion, results, gameover
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const [myGuess, setMyGuess] = useState('');
   const [scores, setScores] = useState({});
   const [roundWinner, setRoundWinner] = useState(null);
@@ -29,16 +31,18 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
   ];
 
   useEffect(() => {
+    console.log('🎨 [PictionaryGame] Iniciando juego');
+    console.log('🎨 [PictionaryGame] RoomCode:', roomCode);
+    console.log('🎨 [PictionaryGame] MyPlayerName:', myPlayerName);
+    console.log('🎨 [PictionaryGame] IsHost:', isHost);
+    console.log('🎨 [PictionaryGame] Jugadores:', initialPlayers);
+    
     // Inicializar puntuaciones
     const initScores = {};
     initialPlayers.forEach(p => {
       initScores[p.name] = 0;
     });
     setScores(initScores);
-
-    if (isHost) {
-      startNewRound();
-    }
 
     // Escuchar eventos
     socketService.onPictionaryUpdate(handleGameUpdate);
@@ -47,58 +51,110 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
     socketService.onPictionaryClear(handleCanvasClear);
 
     return () => {
+      console.log('🎨 [PictionaryGame] Desmontando, limpiando eventos');
       socketService.offPictionary();
     };
   }, []);
 
   useEffect(() => {
-    if (phase === 'playing' && timeLeft > 0) {
+    if (phase === 'drawing' && timeLeft > 0) {
       const timer = setTimeout(() => {
         const newTime = timeLeft - 1;
         setTimeLeft(newTime);
         if (isHost) {
+          console.log(`⏱️ [PictionaryGame] Tiempo restante: ${newTime}s`);
           socketService.syncPictionaryState(roomCode, { timeLeft: newTime });
         }
       }, 1000);
       return () => clearTimeout(timer);
-    } else if (phase === 'playing' && timeLeft === 0) {
+    } else if (phase === 'drawing' && timeLeft === 0) {
       if (isHost) {
-        endRound(null); // Nadie ganó
+        console.log('⏰ [PictionaryGame] ¡Tiempo terminado! Iniciando fase de discusión');
+        startDiscussion();
       }
     }
   }, [phase, timeLeft, isHost]);
 
-  const startNewRound = async () => {
+  const selectCategory = (categoryId) => {
+    console.log('📂 [PictionaryGame] Categoría seleccionada:', categoryId);
+    setSelectedCategory(categoryId);
+    
+    if (isHost) {
+      socketService.syncPictionaryState(roomCode, {
+        phase: 'drawing',
+        selectedCategory: categoryId
+      });
+    }
+    
+    startNewRound(categoryId);
+  };
+
+  const startNewRound = async (category = selectedCategory) => {
+    console.log('🎮 [PictionaryGame] Iniciando nueva ronda');
+    console.log('🎮 [PictionaryGame] Categoría:', category);
     setLoading(true);
     setPhase('waiting');
     
     try {
-      const data = await fetchWord('mixed', false, 'general');
-      setWord(data);
-      setTimeLeft(40);
+      // Generar una palabra DIFERENTE para cada jugador
+      const wordsForPlayers = {};
+      const usedWords = new Set();
+      
+      initialPlayers.forEach(player => {
+        let wordData;
+        // Evitar palabras repetidas
+        do {
+          wordData = getRandomWord(category);
+        } while (usedWords.has(wordData.word) && usedWords.size < 50); // Protección contra bucles infinitos
+        
+        usedWords.add(wordData.word);
+        wordsForPlayers[player.name] = wordData;
+      });
+      
+      console.log('📝 [PictionaryGame] Palabras generadas:', wordsForPlayers);
+      
+      setPlayerWords(wordsForPlayers);
+      setMyWord(wordsForPlayers[myPlayerName]);
+      setTimeLeft(60);
       setMyGuess('');
       setRoundWinner(null);
 
       if (isHost) {
+        console.log('👑 [PictionaryGame] Soy host, sincronizando estado');
         socketService.syncPictionaryState(roomCode, {
-          phase: 'playing',
-          word: data,
-          timeLeft: 40,
+          phase: 'drawing',
+          playerWords: wordsForPlayers,
+          timeLeft: 60,
           roundNumber,
-          roundWinner: null
+          roundWinner: null,
+          selectedCategory: category
         });
       }
 
-      setPhase('playing');
+      setPhase('drawing');
       clearCanvas();
+      console.log('✅ [PictionaryGame] Ronda iniciada en fase de dibujo');
     } catch (e) {
-      console.error('Error al obtener palabra:', e);
+      console.error('❌ [PictionaryGame] Error al iniciar ronda:', e);
     } finally {
       setLoading(false);
     }
   };
 
+  const startDiscussion = () => {
+    console.log('💬 [PictionaryGame] Iniciando fase de discusión');
+    setPhase('discussion');
+    
+    if (isHost) {
+      socketService.syncPictionaryState(roomCode, {
+        phase: 'discussion'
+      });
+    }
+  };
+
   const endRound = (winner) => {
+    console.log('🏁 [PictionaryGame] Finalizando ronda');
+    console.log('🏆 [PictionaryGame] Ganador:', winner);
     setPhase('results');
     setRoundWinner(winner);
 
@@ -121,6 +177,7 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
       setTimeout(() => {
         if (roundNumber >= totalRounds) {
           // Fin del juego
+          console.log('🎉 [PictionaryGame] Juego terminado');
           setPhase('gameover');
           socketService.syncPictionaryState(roomCode, { 
             phase: 'gameover', 
@@ -128,6 +185,7 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
           });
         } else {
           // Siguiente ronda
+          console.log('➡️ [PictionaryGame] Siguiente ronda');
           setRoundNumber(roundNumber + 1);
           startNewRound();
         }
@@ -136,49 +194,82 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
   };
 
   const submitGuess = () => {
-    if (!myGuess.trim() || phase !== 'playing' || roundWinner) return;
+    if (!myGuess.trim() || (phase !== 'drawing' && phase !== 'discussion') || roundWinner) return;
 
     const guess = myGuess.trim().toLowerCase();
-    const correct = guess === word.word.toLowerCase();
+    
+    // Verificar si adivinó alguna palabra de los otros jugadores
+    let foundCorrect = false;
+    for (const [playerName, wordData] of Object.entries(playerWords)) {
+      if (playerName === myPlayerName) continue; // No puede adivinar su propia palabra
+      
+      if (guess === wordData.word.toLowerCase()) {
+        foundCorrect = true;
+        console.log(`✅ [PictionaryGame] ¡${myPlayerName} adivinó la palabra de ${playerName}!`);
+        
+        socketService.sendPictionaryGuess(roomCode, {
+          playerName: myPlayerName,
+          guess: myGuess.trim(),
+          correct: true,
+          guessedPlayer: playerName,
+          timestamp: Date.now()
+        });
 
-    if (correct) {
-      // ¡Acierto!
-      setRoundWinner(myPlayerName);
+        // Dar puntos por adivinar
+        const points = Math.max(100, timeLeft * 5);
+        const newScores = { ...scores };
+        newScores[myPlayerName] = (newScores[myPlayerName] || 0) + points;
+        setScores(newScores);
+        
+        break;
+      }
+    }
+
+    if (!foundCorrect) {
+      console.log(`❌ [PictionaryGame] ${myPlayerName} no adivinó ninguna palabra`);
       socketService.sendPictionaryGuess(roomCode, {
         playerName: myPlayerName,
         guess: myGuess.trim(),
-        correct: true,
+        correct: false,
         timestamp: Date.now()
       });
-
-      if (isHost) {
-        endRound(myPlayerName);
-      }
     }
 
     setMyGuess('');
   };
 
   const handleGameUpdate = ({ gameState }) => {
+    console.log('📥 [PictionaryGame] Actualización de estado recibida:', gameState);
     if (gameState.phase !== undefined) setPhase(gameState.phase);
-    if (gameState.word !== undefined) setWord(gameState.word);
+    if (gameState.playerWords !== undefined) {
+      setPlayerWords(gameState.playerWords);
+      setMyWord(gameState.playerWords[myPlayerName]);
+    }
     if (gameState.timeLeft !== undefined) setTimeLeft(gameState.timeLeft);
     if (gameState.scores !== undefined) setScores(gameState.scores);
     if (gameState.roundWinner !== undefined) setRoundWinner(gameState.roundWinner);
     if (gameState.roundNumber !== undefined) setRoundNumber(gameState.roundNumber);
+    if (gameState.selectedCategory !== undefined) setSelectedCategory(gameState.selectedCategory);
   };
 
   const handleGuessReceived = (guessData) => {
-    if (guessData.correct && !roundWinner) {
-      setRoundWinner(guessData.playerName);
+    console.log('🎯 [PictionaryGame] Adivinanza recibida:', guessData);
+    if (guessData.correct) {
+      console.log(`✅ [PictionaryGame] ${guessData.playerName} adivinó correctamente!`);
+      // Actualizar puntajes si es necesario
+      if (guessData.guessedPlayer) {
+        console.log(`👤 [PictionaryGame] Adivinó la palabra de: ${guessData.guessedPlayer}`);
+      }
     }
   };
 
   const handleDrawingReceived = ({ x, y, color, lineWidth, isDrawing, tool }) => {
+    console.log(`🖌️ [PictionaryGame] Dibujo recibido - x:${x}, y:${y}, drawing:${isDrawing}`);
     drawLine(x, y, color, lineWidth, isDrawing, tool);
   };
 
   const handleCanvasClear = () => {
+    console.log('🗑️ [PictionaryGame] Canvas limpiado');
     clearCanvas();
   };
 
@@ -211,10 +302,12 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
 
   const startDrawing = (e) => {
     const canvas = canvasRef.current;
+    if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const x = ((e.clientX || e.touches?.[0]?.clientX) - rect.left) * (canvas.width / rect.width);
     const y = ((e.clientY || e.touches?.[0]?.clientY) - rect.top) * (canvas.height / rect.height);
 
+    console.log(`🖊️ [PictionaryGame] Empezando a dibujar en x:${x.toFixed(0)}, y:${y.toFixed(0)}`);
     drawLine(x, y, color, lineWidth, false, tool);
     setIsDrawing(true);
     socketService.sendPictionaryDrawing(roomCode, x, y, color, lineWidth, false, tool);
@@ -225,6 +318,7 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
     e.preventDefault();
 
     const canvas = canvasRef.current;
+    if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const x = ((e.clientX || e.touches?.[0]?.clientX) - rect.left) * (canvas.width / rect.width);
     const y = ((e.clientY || e.touches?.[0]?.clientY) - rect.top) * (canvas.height / rect.height);
@@ -234,6 +328,9 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
   };
 
   const stopDrawing = () => {
+    if (isDrawing) {
+      console.log('🖊️ [PictionaryGame] Dejando de dibujar');
+    }
     setIsDrawing(false);
   };
 
@@ -246,6 +343,7 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
   };
 
   const handleClearCanvas = () => {
+    console.log('🗑️ [PictionaryGame] Limpiando canvas localmente y enviando evento');
     clearCanvas();
     socketService.clearPictionaryCanvas(roomCode);
   };
@@ -267,14 +365,52 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
           background: 'linear-gradient(135deg, rgba(34,197,94,0.2), rgba(59,130,246,0.2))'
         }}>
           <h1 style={{ fontSize: '32px', margin: '0 0 8px', fontWeight: '900' }}>
-            🎨 Dibuja y Adivina - Todos Juegan
+            🎨 Pictionary Colombiano - Todos Dibujan
           </h1>
           <div style={{ fontSize: '16px', color: C.muted }}>
-            Ronda {roundNumber} de {totalRounds} • Todos dibujan, el primero en adivinar gana
+            Ronda {roundNumber} de {totalRounds} • Cada uno dibuja su propia palabra
           </div>
         </div>
 
-        {phase === 'playing' && word && (
+        {phase === 'category-select' && isHost && (
+          <div style={{ ...card({ padding: '32px', textAlign: 'center' }) }}>
+            <h2 style={{ fontSize: '28px', marginBottom: '24px', fontWeight: '800' }}>
+              📂 Selecciona una Categoría
+            </h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+              {getCategories().map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => selectCategory(cat.id)}
+                  style={{
+                    ...btn('ghost', { padding: '20px', fontSize: '16px' }),
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <span style={{ fontSize: '32px' }}>{cat.emoji}</span>
+                  <span>{cat.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {phase === 'category-select' && !isHost && (
+          <div style={{ ...card({ padding: '32px', textAlign: 'center' }) }}>
+            <div style={{ fontSize: '52px', marginBottom: '16px' }}>⏳</div>
+            <h2 style={{ fontSize: '24px', marginBottom: '12px', fontWeight: '800' }}>
+              Esperando al anfitrión
+            </h2>
+            <p style={{ color: C.muted, fontSize: '16px' }}>
+              El anfitrión está seleccionando la categoría...
+            </p>
+          </div>
+        )}
+
+        {phase === 'drawing' && myWord && (
           <>
             {/* Información de tiempo y palabra */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', marginBottom: '16px', alignItems: 'center' }}>
@@ -297,32 +433,19 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
 
               <div style={{ 
                 ...card({ padding: '20px', textAlign: 'center' }),
-                background: roundWinner ? C.greenDim : C.purpleDim,
-                borderColor: roundWinner ? C.greenBorder : C.purpleBorder,
+                background: C.purpleDim,
+                borderColor: C.purpleBorder,
                 minWidth: '300px'
               }}>
-                {roundWinner ? (
-                  <>
-                    <div style={{ fontSize: '16px', color: C.green, marginBottom: '6px', fontWeight: '700' }}>
-                      🏆 ¡{roundWinner} GANÓ!
-                    </div>
-                    <div style={{ fontSize: '24px', fontWeight: '900', color: '#86efac' }}>
-                      {word.emoji} {word.word}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div style={{ fontSize: '13px', color: C.muted, marginBottom: '6px' }}>
-                      🎯 PALABRA SECRETA
-                    </div>
-                    <div style={{ fontSize: '28px', fontWeight: '900', color: '#c4b5fd' }}>
-                      {word.emoji} {"_ ".repeat(word.word.length)}
-                    </div>
-                    <div style={{ fontSize: '12px', color: C.hint, marginTop: '4px' }}>
-                      {word.category} • {word.word.length} letras
-                    </div>
-                  </>
-                )}
+                <div style={{ fontSize: '13px', color: C.muted, marginBottom: '6px' }}>
+                  🎯 TU PALABRA SECRETA
+                </div>
+                <div style={{ fontSize: '28px', fontWeight: '900', color: '#c4b5fd' }}>
+                  {myWord.emoji} {myWord.word}
+                </div>
+                <div style={{ fontSize: '12px', color: C.hint, marginTop: '4px' }}>
+                  {myWord.category} • Dibuja esto
+                </div>
               </div>
 
               <div style={{ 
@@ -356,7 +479,7 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
                     color: '#86efac',
                     fontWeight: '700'
                   }}>
-                    🎨 ¡TODOS PUEDEN DIBUJAR! Ayuda a adivinar la palabra
+                    🎨 Dibuja "{myWord.word}" - Los demás intentan adivinar
                   </div>
 
                   <canvas
@@ -469,72 +592,53 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
               {/* Panel de adivinanza y puntuaciones */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {/* Adivinar */}
-                {!roundWinner && (
-                  <div style={{ ...card({ padding: '16px' }) }}>
-                    <h3 style={{ margin: '0 0 12px', fontSize: '16px', fontWeight: '700' }}>
-                      🎯 Adivina la Palabra
-                    </h3>
+                <div style={{ ...card({ padding: '16px' }) }}>
+                  <h3 style={{ margin: '0 0 12px', fontSize: '16px', fontWeight: '700' }}>
+                    🎯 Adivina las Palabras de Otros
+                  </h3>
 
-                    <div style={{ 
-                      padding: '12px',
-                      background: 'rgba(139,92,246,0.1)',
-                      borderRadius: '8px',
-                      marginBottom: '12px',
-                      fontSize: '13px',
-                      color: C.muted,
-                      lineHeight: 1.5
-                    }}>
-                      💡 Mira los dibujos de todos y escribe la palabra. ¡El primero en acertar gana puntos!
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <input
-                        type="text"
-                        value={myGuess}
-                        onChange={(e) => setMyGuess(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && submitGuess()}
-                        placeholder="Escribe tu respuesta..."
-                        disabled={roundWinner}
-                        style={{
-                          flex: 1,
-                          padding: '12px',
-                          borderRadius: '8px',
-                          border: `1px solid ${C.border}`,
-                          background: 'rgba(255,255,255,0.06)',
-                          color: C.text,
-                          fontSize: '15px',
-                          outline: 'none'
-                        }}
-                      />
-                      <button
-                        onClick={submitGuess}
-                        disabled={!myGuess.trim() || roundWinner}
-                        style={{
-                          ...btn('primary', { padding: '12px 20px', fontSize: '15px' }),
-                          opacity: (!myGuess.trim() || roundWinner) ? 0.5 : 1
-                        }}
-                      >
-                        📤
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {roundWinner && (
                   <div style={{ 
-                    ...card({ padding: '20px', textAlign: 'center' }),
-                    background: C.greenDim,
-                    borderColor: C.greenBorder
+                    padding: '12px',
+                    background: 'rgba(139,92,246,0.1)',
+                    borderRadius: '8px',
+                    marginBottom: '12px',
+                    fontSize: '13px',
+                    color: C.muted,
+                    lineHeight: 1.5
                   }}>
-                    <div style={{ fontSize: '48px', marginBottom: '12px' }}>🎉</div>
-                    <div style={{ fontSize: '18px', fontWeight: '700', color: '#86efac', marginBottom: '8px' }}>
-                      ¡{roundWinner} GANÓ!
-                    </div>
-                    <div style={{ fontSize: '14px', color: C.muted }}>
-                      +{Math.max(100, timeLeft * 10)} puntos
-                    </div>
+                    💡 Mira los dibujos de todos. ¡Puedes adivinar múltiples palabras!
                   </div>
-                )}
+
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="text"
+                      value={myGuess}
+                      onChange={(e) => setMyGuess(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && submitGuess()}
+                      placeholder="Escribe tu respuesta..."
+                      style={{
+                        flex: 1,
+                        padding: '12px',
+                        borderRadius: '8px',
+                        border: `1px solid ${C.border}`,
+                        background: 'rgba(255,255,255,0.06)',
+                        color: C.text,
+                        fontSize: '15px',
+                        outline: 'none'
+                      }}
+                    />
+                    <button
+                      onClick={submitGuess}
+                      disabled={!myGuess.trim()}
+                      style={{
+                        ...btn('primary', { padding: '12px 20px', fontSize: '15px' }),
+                        opacity: !myGuess.trim() ? 0.5 : 1
+                      }}
+                    >
+                      📤
+                    </button>
+                  </div>
+                </div>
 
                 {/* Tabla de puntuaciones */}
                 <div style={{ ...card({ padding: '16px' }) }}>
@@ -576,6 +680,68 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
               </div>
             </div>
           </>
+        )}
+
+        {phase === 'discussion' && (
+          <div style={{ maxWidth: '800px', width: '100%', margin: '0 auto' }}>
+            <div style={{ ...card({ padding: '32px', textAlign: 'center', marginBottom: '16px' }) }}>
+              <h2 style={{ fontSize: '28px', fontWeight: '900', marginBottom: '16px' }}>
+                💬 Fase de Discusión
+              </h2>
+              <p style={{ color: C.muted, fontSize: '16px', marginBottom: '24px' }}>
+                ¡El tiempo de dibujo ha terminado! Ahora pueden seguir adivinando y votar quién dibujó qué.
+              </p>
+              
+              {/* Mostrar todas las palabras reveladas */}
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '12px',
+                marginBottom: '24px'
+              }}>
+                {Object.entries(playerWords).map(([playerName, wordData]) => (
+                  <div key={playerName} style={{
+                    ...card({ padding: '16px' }),
+                    background: C.purpleDim,
+                    borderColor: C.purpleBorder
+                  }}>
+                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>
+                      {wordData.emoji}
+                    </div>
+                    <div style={{ fontSize: '18px', fontWeight: '700', color: '#c4b5fd', marginBottom: '4px' }}>
+                      {wordData.word}
+                    </div>
+                    <div style={{ fontSize: '12px', color: C.hint }}>
+                      ¿Quién lo dibujó?
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {isHost ? (
+                <button 
+                  onClick={() => {
+                    console.log('🏁 [PictionaryGame] Host termina la ronda');
+                    endRound(null);
+                  }}
+                  style={btn('primary', { padding: '16px 32px', fontSize: '16px' })}
+                >
+                  🏁 Terminar Ronda
+                </button>
+              ) : (
+                <div style={{
+                  padding: '16px',
+                  borderRadius: '12px',
+                  background: C.surface,
+                  border: `1px solid ${C.border}`,
+                  color: C.muted,
+                  fontSize: '14px',
+                }}>
+                  ⏳ Esperando que el anfitrión termine la ronda...
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {phase === 'gameover' && (

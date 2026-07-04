@@ -30,6 +30,7 @@ export default function VoiceChat({ roomCode, myPlayerName }) {
     socketService.onVoiceAnswer(handleReceiveAnswer);
     socketService.onVoiceIceCandidate(handleReceiveIceCandidate);
     socketService.onVoiceUserDisconnected(handleUserDisconnected);
+    socketService.onVoiceUserJoined(handleUserJoined);
 
     return () => {
       stopVoiceChat();
@@ -207,6 +208,28 @@ export default function VoiceChat({ roomCode, myPlayerName }) {
     peerConnectionsRef.current[targetUserId] = pc;
     console.log('✅ [VoiceChat] Conexión peer creada con:', targetUserId);
     return pc;
+  };
+
+  const handleUserJoined = async ({ userId, playerName }) => {
+    console.log('👋 [VoiceChat] Nuevo usuario unido:', userId, playerName);
+    
+    // Solo el usuario que ya estaba crea la oferta
+    if (!localStreamRef.current) {
+      console.warn('⚠️ [VoiceChat] No hay stream local todavía');
+      return;
+    }
+    
+    try {
+      console.log('📤 [VoiceChat] Creando oferta para:', userId);
+      const pc = createPeerConnection(userId);
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      
+      socketService.sendVoiceOffer(roomCode, userId, offer);
+      console.log('✅ [VoiceChat] Oferta enviada a:', userId);
+    } catch (err) {
+      console.error('❌ [VoiceChat] Error al crear oferta:', err);
+    }
   };
 
   const handleReceiveOffer = async ({ from, offer }) => {

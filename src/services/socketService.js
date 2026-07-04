@@ -204,6 +204,10 @@ class SocketService {
     this.socket.on('voice-ice-candidate', callback);
   }
 
+  onVoiceUserJoined(callback) {
+    this.socket.on('voice-user-joined', callback);
+  }
+
   onVoiceUserDisconnected(callback) {
     this.socket.on('voice-user-disconnected', callback);
   }
@@ -213,6 +217,7 @@ class SocketService {
       this.socket.off('voice-offer');
       this.socket.off('voice-answer');
       this.socket.off('voice-ice-candidate');
+      this.socket.off('voice-user-joined');
       this.socket.off('voice-user-disconnected');
     }
   }
