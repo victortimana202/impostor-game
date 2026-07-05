@@ -50,20 +50,41 @@ io.on('connection', (socket) => {
     console.log('🚪 [Server] PlayerName:', playerName);
     console.log('🚪 [Server] Socket ID:', socket.id);
     
-    const room = rooms.get(roomCode);
+    let room = rooms.get(roomCode);
     
     if (!room) {
       console.error('❌ [Server] Sala no encontrada:', roomCode);
       console.log('📊 [Server] Salas disponibles:', Array.from(rooms.keys()));
-      socket.emit('error', { message: 'Sala no encontrada' });
+      
+      // Si la sala no existe, intentar recrearla con este jugador
+      console.log('🔄 [Server] Intentando recrear sala para reconexión');
+      room = {
+        host: socket.id,
+        players: [{ id: socket.id, name: playerName, ready: false }],
+        gameState: null,
+        config: null,
+      };
+      rooms.set(roomCode, room);
+      socket.join(roomCode);
+      socket.emit('room-created', { roomCode });
+      console.log('✅ [Server] Sala recreada para reconexión:', roomCode);
       return;
     }
     
     console.log('✅ [Server] Sala encontrada');
     console.log('👥 [Server] Jugadores actuales:', room.players.length);
     
+    // Verificar si el jugador ya existe (reconexión)
+    const existingPlayer = room.players.find(p => p.name === playerName);
+    if (existingPlayer) {
+      console.log('🔄 [Server] Jugador reconectando, actualizando socket ID');
+      existingPlayer.id = socket.id;
+    } else {
+      // Nuevo jugador
+      room.players.push({ id: socket.id, name: playerName, ready: false });
+    }
+    
     socket.join(roomCode);
-    room.players.push({ id: socket.id, name: playerName, ready: false });
     
     io.to(roomCode).emit('player-joined', { 
       players: room.players,
