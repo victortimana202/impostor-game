@@ -1,11 +1,18 @@
 import { io } from 'socket.io-client';
 
 // TEMPORAL: Hardcoded hasta resolver problema de variables en Vercel
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'https://impostor-game-server-i1h5.onrender.com';
+let SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'https://impostor-game-server-i1h5.onrender.com';
+
+// Fix: Remover protocolo si existe para evitar 'wss://https://'
+if (SOCKET_URL.startsWith('https://')) {
+  SOCKET_URL = SOCKET_URL.replace('https://', '');
+} else if (SOCKET_URL.startsWith('http://')) {
+  SOCKET_URL = SOCKET_URL.replace('http://', '');
+}
 
 console.log('🔧 [SocketService] Variables de entorno:');
 console.log('   - VITE_SOCKET_URL:', import.meta.env.VITE_SOCKET_URL);
-console.log('   - SOCKET_URL final:', SOCKET_URL);
+console.log('   - SOCKET_URL limpia (sin protocolo):', SOCKET_URL);
 
 class SocketService {
   constructor() {
