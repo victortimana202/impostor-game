@@ -209,7 +209,9 @@ io.on('connection', (socket) => {
   });
 
   socket.on('pictionary-drawing', ({ roomCode, x, y, color, lineWidth, isDrawing, tool, playerName }) => {
-    socket.to(roomCode).emit('pictionary-drawing', { x, y, color, lineWidth, isDrawing, tool, playerName });
+    // Usar io.to() para enviar a TODOS en la sala (incluyendo al emisor)
+    // Esto permite que todos vean los dibujos de todos en tiempo real
+    io.to(roomCode).emit('pictionary-drawing', { x, y, color, lineWidth, isDrawing, tool, playerName });
   });
 
   socket.on('pictionary-clear-canvas', ({ roomCode, playerName }) => {

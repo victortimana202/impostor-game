@@ -3,17 +3,34 @@ import { io } from 'socket.io-client';
 // Obtener URL del servidor
 let rawURL = import.meta.env.VITE_SOCKET_URL || 'https://impostor-game-server-i1h5.onrender.com';
 
-// CRÍTICO: Socket.io no maneja bien URLs con protocolo
-// Necesitamos pasar solo el dominio, socket.io agregará wss:// automáticamente
-let SOCKET_URL = rawURL
-  .replace('https://', '')
-  .replace('http://', '')
-  .replace(/\/$/, ''); // Remover trailing slash si existe
+console.log('🔧 [SocketService] Variables de entorno:');
+console.log('   - VITE_SOCKET_URL:', import.meta.env.VITE_SOCKET_URL);
+console.log('   - rawURL antes de limpiar:', rawURL);
 
-console.log('🔧 [SocketService] Configuración de conexión:');
-console.log('   - URL original (VITE_SOCKET_URL):', rawURL);
-console.log('   - URL procesada (sin protocolo):', SOCKET_URL);
-console.log('   - Socket.io conectará a: wss://' + SOCKET_URL);
+// CRÍTICO: Socket.io automáticamente agrega wss:// cuando se usa transporte websocket
+// Si pasamos la URL con protocolo, intentará conectar a wss://https://... (malformado)
+// Debemos pasar SOLO el hostname sin ningún protocolo
+
+// Método más robusto: extraer solo el hostname usando URL API
+let SOCKET_URL;
+try {
+  // Si tiene protocolo, extraer solo el host
+  if (rawURL.includes('://')) {
+    const urlObj = new URL(rawURL);
+    SOCKET_URL = urlObj.host; // Solo dominio:puerto sin protocolo
+  } else {
+    // Ya es solo el hostname
+    SOCKET_URL = rawURL.replace(/\/$/, '');
+  }
+} catch (e) {
+  // Fallback: limpieza manual
+  SOCKET_URL = rawURL
+    .replace(/^https?:\/\//, '') // Quitar protocolo
+    .replace(/\/$/, ''); // Quitar trailing slash
+}
+
+console.log('   - SOCKET_URL limpia (sin protocolo):', SOCKET_URL);
+console.log('   - Socket.io conectará automáticamente a: wss://' + SOCKET_URL);
 
 class SocketService {
   constructor() {
