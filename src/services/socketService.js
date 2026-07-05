@@ -2,6 +2,10 @@ import { io } from 'socket.io-client';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
 
+console.log('🔧 [SocketService] Variables de entorno:');
+console.log('   - VITE_SOCKET_URL:', import.meta.env.VITE_SOCKET_URL);
+console.log('   - SOCKET_URL final:', SOCKET_URL);
+
 class SocketService {
   constructor() {
     this.socket = null;
