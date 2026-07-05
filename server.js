@@ -206,12 +206,12 @@ io.on('connection', (socket) => {
     io.to(roomCode).emit('pictionary-guess', { playerName, guess, correct, timestamp });
   });
 
-  socket.on('pictionary-drawing', ({ roomCode, x, y, color, lineWidth, isDrawing, tool }) => {
-    socket.to(roomCode).emit('pictionary-drawing', { x, y, color, lineWidth, isDrawing, tool });
+  socket.on('pictionary-drawing', ({ roomCode, x, y, color, lineWidth, isDrawing, tool, playerName }) => {
+    socket.to(roomCode).emit('pictionary-drawing', { x, y, color, lineWidth, isDrawing, tool, playerName });
   });
 
-  socket.on('pictionary-clear-canvas', ({ roomCode }) => {
-    io.to(roomCode).emit('pictionary-clear-canvas');
+  socket.on('pictionary-clear-canvas', ({ roomCode, playerName }) => {
+    io.to(roomCode).emit('pictionary-clear-canvas', { playerName });
   });
 
   // Pictionary V2 Events (con turnos)

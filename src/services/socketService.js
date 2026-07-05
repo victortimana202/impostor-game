@@ -258,12 +258,12 @@ class SocketService {
     this.socket.emit('pictionary-guess', { roomCode, ...guessData });
   }
 
-  sendPictionaryDrawing(roomCode, x, y, color, lineWidth, isDrawing, tool) {
-    this.socket.emit('pictionary-drawing', { roomCode, x, y, color, lineWidth, isDrawing, tool });
+  sendPictionaryDrawing(roomCode, x, y, color, lineWidth, isDrawing, tool, playerName) {
+    this.socket.emit('pictionary-drawing', { roomCode, x, y, color, lineWidth, isDrawing, tool, playerName });
   }
 
-  clearPictionaryCanvas(roomCode) {
-    this.socket.emit('pictionary-clear-canvas', { roomCode });
+  clearPictionaryCanvas(roomCode, playerName) {
+    this.socket.emit('pictionary-clear-canvas', { roomCode, playerName });
   }
 
   onPictionaryUpdate(callback) {

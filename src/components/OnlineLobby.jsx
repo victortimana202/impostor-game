@@ -46,20 +46,12 @@ export default function OnlineLobby({ onStartGame, onBack, setMyPlayerName, cfg,
       console.log('🎨 [OnlineLobby] Pictionary iniciado! Jugadores:', playerNames);
       console.log('🎨 [OnlineLobby] Host ID:', hostId);
       console.log('🎨 [OnlineLobby] Mi Socket ID:', socketService.socket?.id);
+      console.log('🎨 [OnlineLobby] Mi nombre local guardado:', localPlayerName);
       
       // Solo procesar si NO soy el host (para evitar doble inicio)
       if (socketService.socket?.id !== hostId) {
-        // Buscar mi nombre en playerNames comparando con el último jugador que se unió
-        // Como somos 2 jugadores, si yo no soy el host, busco en la lista
-        setPlayers(currentPlayers => {
-          const myPlayer = currentPlayers.find(p => p.id === socketService.socket?.id);
-          const myName = myPlayer ? myPlayer.name : '';
-          
-          console.log('✅ [OnlineLobby] No soy host, mi nombre es:', myName);
-          onStartPictionary(playerNames, false, myName);
-          
-          return currentPlayers; // No cambiar el estado
-        });
+        console.log('✅ [OnlineLobby] No soy host, iniciando Pictionary con nombre:', localPlayerName);
+        onStartPictionary(playerNames, false, localPlayerName);
       } else {
         console.log('ℹ️ [OnlineLobby] Soy el host, ya inicié localmente');
       }
