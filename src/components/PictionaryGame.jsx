@@ -6,7 +6,7 @@ import socketService from '../services/socketService';
 export default function PictionaryGame({ roomCode, players: initialPlayers, onBack, isHost, myPlayerName }) {
   const [playerWords, setPlayerWords] = useState({}); // Cada jugador tiene su propia palabra
   const [myWord, setMyWord] = useState(null); // Mi palabra personal
-  const [timeLeft, setTimeLeft] = useState(60); // 1 minuto para dibujar
+  const [timeLeft, setTimeLeft] = useState(120); // 2 minutos para dibujar
   const [phase, setPhase] = useState('category-select'); // category-select, waiting, drawing, discussion, results, gameover
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [myGuess, setMyGuess] = useState('');
@@ -146,7 +146,7 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
       
       setPlayerWords(wordsForPlayers);
       setMyWord(wordsForPlayers[myPlayerName]);
-      setTimeLeft(60);
+      setTimeLeft(120);
       setMyGuess('');
       setRoundWinner(null);
 
@@ -155,7 +155,7 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
         socketService.syncPictionaryState(roomCode, {
           phase: 'drawing',
           playerWords: wordsForPlayers,
-          timeLeft: 60,
+          timeLeft: 120,
           roundNumber,
           roundWinner: null,
           selectedCategory: category
