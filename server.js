@@ -55,19 +55,7 @@ io.on('connection', (socket) => {
     if (!room) {
       console.error('❌ [Server] Sala no encontrada:', roomCode);
       console.log('📊 [Server] Salas disponibles:', Array.from(rooms.keys()));
-      
-      // Si la sala no existe, intentar recrearla con este jugador
-      console.log('🔄 [Server] Intentando recrear sala para reconexión');
-      room = {
-        host: socket.id,
-        players: [{ id: socket.id, name: playerName, ready: false }],
-        gameState: null,
-        config: null,
-      };
-      rooms.set(roomCode, room);
-      socket.join(roomCode);
-      socket.emit('room-created', { roomCode });
-      console.log('✅ [Server] Sala recreada para reconexión:', roomCode);
+      socket.emit('room-error', { error: 'Sala no encontrada' });
       return;
     }
     
@@ -86,6 +74,13 @@ io.on('connection', (socket) => {
     
     socket.join(roomCode);
     
+    // IMPORTANTE: Emitir room-joined al jugador que se une
+    socket.emit('room-joined', { 
+      players: room.players,
+      isHost: room.host === socket.id
+    });
+    
+    // Notificar a todos los jugadores de la sala
     io.to(roomCode).emit('player-joined', { 
       players: room.players,
       playerName 

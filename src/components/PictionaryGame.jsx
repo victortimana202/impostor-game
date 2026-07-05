@@ -787,7 +787,8 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
                 zIndex: 9999,
                 display: 'flex',
                 flexDirection: 'column',
-                padding: '16px'
+                padding: '16px',
+                overflow: 'auto'
               }}>
                 {/* Header del modal */}
                 <div style={{
@@ -795,7 +796,8 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   marginBottom: '16px',
-                  color: C.text
+                  color: C.text,
+                  flexShrink: 0
                 }}>
                   <div>
                     <div style={{ fontSize: '18px', fontWeight: '700', color: '#86efac' }}>
@@ -817,29 +819,45 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
                   </button>
                 </div>
 
-                {/* Canvas maximizado */}
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <canvas
-                    ref={el => canvasRefs.current[maximizedCanvas] = el}
-                    width={800}
-                    height={600}
-                    onMouseDown={maximizedCanvas === myPlayerName ? startDrawing : undefined}
-                    onMouseMove={maximizedCanvas === myPlayerName ? draw : undefined}
-                    onMouseUp={maximizedCanvas === myPlayerName ? stopDrawing : undefined}
-                    onMouseLeave={maximizedCanvas === myPlayerName ? stopDrawing : undefined}
-                    onTouchStart={maximizedCanvas === myPlayerName ? startDrawing : undefined}
-                    onTouchMove={maximizedCanvas === myPlayerName ? draw : undefined}
-                    onTouchEnd={maximizedCanvas === myPlayerName ? stopDrawing : undefined}
-                    style={{
-                      maxWidth: '100%',
-                      maxHeight: '100%',
-                      borderRadius: '8px',
-                      cursor: maximizedCanvas === myPlayerName ? 'crosshair' : 'default',
-                      background: '#1a1a2e',
-                      border: `2px solid ${C.green}`,
-                      touchAction: maximizedCanvas === myPlayerName ? 'none' : 'auto'
-                    }}
-                  />
+                {/* Canvas maximizado con ZOOM CSS (no cambia el tamaño real) */}
+                <div style={{ 
+                  flex: 1, 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  overflow: 'auto',
+                  minHeight: 0
+                }}>
+                  <div style={{
+                    transform: 'scale(2)', // Zoom 2x
+                    transformOrigin: 'center',
+                    margin: '50%' // Espacio para el zoom
+                  }}>
+                    <canvas
+                      ref={el => {
+                        if (el && !canvasRefs.current[maximizedCanvas]) {
+                          canvasRefs.current[maximizedCanvas] = el;
+                        }
+                      }}
+                      width={400}
+                      height={300}
+                      onMouseDown={maximizedCanvas === myPlayerName ? startDrawing : undefined}
+                      onMouseMove={maximizedCanvas === myPlayerName ? draw : undefined}
+                      onMouseUp={maximizedCanvas === myPlayerName ? stopDrawing : undefined}
+                      onMouseLeave={maximizedCanvas === myPlayerName ? stopDrawing : undefined}
+                      onTouchStart={maximizedCanvas === myPlayerName ? startDrawing : undefined}
+                      onTouchMove={maximizedCanvas === myPlayerName ? draw : undefined}
+                      onTouchEnd={maximizedCanvas === myPlayerName ? stopDrawing : undefined}
+                      style={{
+                        borderRadius: '8px',
+                        cursor: maximizedCanvas === myPlayerName ? 'crosshair' : 'default',
+                        background: '#1a1a2e',
+                        border: `2px solid ${C.green}`,
+                        touchAction: maximizedCanvas === myPlayerName ? 'none' : 'auto',
+                        display: 'block'
+                      }}
+                    />
+                  </div>
                 </div>
 
                 {/* Herramientas de dibujo en modal */}
@@ -847,7 +865,8 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
                   <div style={{ 
                     ...card({ padding: '16px', marginTop: '16px' }),
                     background: 'rgba(139,92,246,0.1)',
-                    borderColor: C.purpleBorder
+                    borderColor: C.purpleBorder,
+                    flexShrink: 0
                   }}>
                     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
                       {/* Herramientas */}
