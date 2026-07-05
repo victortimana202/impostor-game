@@ -30,6 +30,7 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
   const [savedCanvasImages, setSavedCanvasImages] = useState({}); // { playerName: imageDataURL } - guardar los dibujos
   const [guessingStartTime, setGuessingStartTime] = useState(null); // Tiempo de inicio de la fase de adivinanza
   const [solveTime, setSolveTime] = useState({}); // { playerName: { wordOwner: timeInSeconds } } - tiempo que tardó en resolver
+  const [maximizedCanvas, setMaximizedCanvas] = useState(null); // playerName del canvas maximizado, null si ninguno
 
   // Canvas states - uno por jugador
   const canvasRefs = useRef({}); // { playerName: canvasRef }
@@ -715,8 +716,14 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
 
         {phase === 'drawing' && myWord && (
           <>
-            {/* Información de tiempo y palabra */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', marginBottom: '16px', alignItems: 'center' }}>
+            {/* Información de tiempo y palabra - RESPONSIVE */}
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: window.innerWidth > 768 ? '1fr auto 1fr' : '1fr',
+              gap: '12px', 
+              marginBottom: '16px', 
+              alignItems: 'center' 
+            }}>
               <div style={{ 
                 ...card({ padding: '16px', textAlign: 'center' }),
                 background: timeLeft < 10 ? C.redDim : C.goldDim,
@@ -738,7 +745,7 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
                 ...card({ padding: '20px', textAlign: 'center' }),
                 background: C.purpleDim,
                 borderColor: C.purpleBorder,
-                minWidth: '300px'
+                minWidth: window.innerWidth > 768 ? '300px' : 'auto'
               }}>
                 <div style={{ fontSize: '13px', color: C.muted, marginBottom: '6px' }}>
                   🎯 TU PALABRA SECRETA
@@ -768,7 +775,167 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '16px' }}>
+            {/* Modal de Canvas Maximizado */}
+            {maximizedCanvas && (
+              <div style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0,0,0,0.95)',
+                zIndex: 9999,
+                display: 'flex',
+                flexDirection: 'column',
+                padding: '16px'
+              }}>
+                {/* Header del modal */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '16px',
+                  color: C.text
+                }}>
+                  <div>
+                    <div style={{ fontSize: '18px', fontWeight: '700', color: '#86efac' }}>
+                      Canvas {playerLabels[maximizedCanvas]} {maximizedCanvas === myPlayerName && '(TÚ)'}
+                    </div>
+                    {maximizedCanvas === myPlayerName && myWord && (
+                      <div style={{ fontSize: '14px', color: C.hint, marginTop: '4px' }}>
+                        {myWord.word} - {myWord.category}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setMaximizedCanvas(null)}
+                    style={{
+                      ...btn('danger', { padding: '10px 20px', fontSize: '16px' })
+                    }}
+                  >
+                    ✕ Cerrar
+                  </button>
+                </div>
+
+                {/* Canvas maximizado */}
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <canvas
+                    ref={el => canvasRefs.current[maximizedCanvas] = el}
+                    width={800}
+                    height={600}
+                    onMouseDown={maximizedCanvas === myPlayerName ? startDrawing : undefined}
+                    onMouseMove={maximizedCanvas === myPlayerName ? draw : undefined}
+                    onMouseUp={maximizedCanvas === myPlayerName ? stopDrawing : undefined}
+                    onMouseLeave={maximizedCanvas === myPlayerName ? stopDrawing : undefined}
+                    onTouchStart={maximizedCanvas === myPlayerName ? startDrawing : undefined}
+                    onTouchMove={maximizedCanvas === myPlayerName ? draw : undefined}
+                    onTouchEnd={maximizedCanvas === myPlayerName ? stopDrawing : undefined}
+                    style={{
+                      maxWidth: '100%',
+                      maxHeight: '100%',
+                      borderRadius: '8px',
+                      cursor: maximizedCanvas === myPlayerName ? 'crosshair' : 'default',
+                      background: '#1a1a2e',
+                      border: `2px solid ${C.green}`,
+                      touchAction: maximizedCanvas === myPlayerName ? 'none' : 'auto'
+                    }}
+                  />
+                </div>
+
+                {/* Herramientas de dibujo en modal */}
+                {maximizedCanvas === myPlayerName && (
+                  <div style={{ 
+                    ...card({ padding: '16px', marginTop: '16px' }),
+                    background: 'rgba(139,92,246,0.1)',
+                    borderColor: C.purpleBorder
+                  }}>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      {/* Herramientas */}
+                      <button
+                        onClick={() => setTool('pen')}
+                        style={{
+                          ...btn(tool === 'pen' ? 'primary' : 'ghost', { 
+                            padding: '12px 16px',
+                            fontSize: '14px'
+                          })
+                        }}
+                      >
+                        ✏️ Lápiz
+                      </button>
+                      <button
+                        onClick={() => setTool('eraser')}
+                        style={{
+                          ...btn(tool === 'eraser' ? 'danger' : 'ghost', { 
+                            padding: '12px 16px',
+                            fontSize: '14px'
+                          })
+                        }}
+                      >
+                        🧹 Borrador
+                      </button>
+                      <button
+                        onClick={handleClearCanvas}
+                        style={{
+                          ...btn('ghost', { padding: '12px 16px', fontSize: '14px' }),
+                          borderColor: C.redBorder
+                        }}
+                      >
+                        🗑️ Limpiar
+                      </button>
+
+                      {/* Colores principales */}
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        {['#ffffff', '#000000', '#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'].map(c => (
+                          <button
+                            key={c}
+                            onClick={() => { setColor(c); setTool('pen'); }}
+                            style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '6px',
+                              background: c,
+                              border: color === c ? `3px solid ${C.green}` : `1px solid ${C.border}`,
+                              cursor: 'pointer',
+                              transform: color === c ? 'scale(1.1)' : 'scale(1)',
+                              transition: 'all 0.2s'
+                            }}
+                          />
+                        ))}
+                      </div>
+
+                      {/* Grosor */}
+                      <div style={{ flex: 1, minWidth: '150px' }}>
+                        <div style={{ 
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          fontSize: '12px',
+                          marginBottom: '6px',
+                          color: C.text
+                        }}>
+                          <span>Grosor</span>
+                          <span style={{ fontWeight: '700' }}>{lineWidth}px</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="1"
+                          max="30"
+                          value={lineWidth}
+                          onChange={(e) => setLineWidth(parseInt(e.target.value))}
+                          style={{ width: '100%', accentColor: C.green }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Layout principal - RESPONSIVE */}
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: window.innerWidth > 1024 ? '3fr 1fr' : '1fr',
+              gap: '16px' 
+            }}>
               {/* Grilla de Canvas - Todos los jugadores */}
               <div>
                 <div style={{ ...card({ padding: '16px' }) }}>
@@ -785,10 +952,12 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
                     🎨 Cada uno dibuja su palabra - Solo puedes dibujar en TU canvas
                   </div>
 
-                  {/* Grilla de Canvas */}
+                  {/* Grilla de Canvas - RESPONSIVE */}
                   <div style={{ 
                     display: 'grid', 
-                    gridTemplateColumns: initialPlayers.length > 2 ? 'repeat(2, 1fr)' : '1fr',
+                    gridTemplateColumns: window.innerWidth > 768 
+                      ? (initialPlayers.length > 2 ? 'repeat(2, 1fr)' : '1fr')
+                      : '1fr',
                     gap: '12px',
                     marginBottom: '16px'
                   }}>
@@ -806,7 +975,9 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
                             marginBottom: '8px',
                             display: 'flex',
                             justifyContent: 'space-between',
-                            alignItems: 'center'
+                            alignItems: 'center',
+                            flexWrap: 'wrap',
+                            gap: '8px'
                           }}>
                             <div>
                               <div style={{ fontSize: '14px', fontWeight: '700', color: isMyCanvas ? '#86efac' : C.text }}>
@@ -818,17 +989,28 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
                                 </div>
                               )}
                             </div>
-                            {isMyCanvas && (
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              {isMyCanvas && (
+                                <button
+                                  onClick={handleClearCanvas}
+                                  style={{
+                                    ...btn('ghost', { padding: '6px 10px', fontSize: '12px' }),
+                                    borderColor: C.redBorder
+                                  }}
+                                >
+                                  🗑️
+                                </button>
+                              )}
                               <button
-                                onClick={handleClearCanvas}
+                                onClick={() => setMaximizedCanvas(player.name)}
                                 style={{
                                   ...btn('ghost', { padding: '6px 10px', fontSize: '12px' }),
-                                  borderColor: C.redBorder
+                                  borderColor: C.greenBorder
                                 }}
                               >
-                                🗑️
+                                🔍 Zoom
                               </button>
-                            )}
+                            </div>
                           </div>
 
                           {/* Canvas */}
