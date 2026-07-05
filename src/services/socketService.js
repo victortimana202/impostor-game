@@ -1,18 +1,19 @@
 import { io } from 'socket.io-client';
 
-// TEMPORAL: Hardcoded hasta resolver problema de variables en Vercel
-let SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'https://impostor-game-server-i1h5.onrender.com';
+// Obtener URL del servidor
+let rawURL = import.meta.env.VITE_SOCKET_URL || 'https://impostor-game-server-i1h5.onrender.com';
 
-// Fix: Remover protocolo si existe para evitar 'wss://https://'
-if (SOCKET_URL.startsWith('https://')) {
-  SOCKET_URL = SOCKET_URL.replace('https://', '');
-} else if (SOCKET_URL.startsWith('http://')) {
-  SOCKET_URL = SOCKET_URL.replace('http://', '');
-}
+// CRÍTICO: Socket.io no maneja bien URLs con protocolo
+// Necesitamos pasar solo el dominio, socket.io agregará wss:// automáticamente
+let SOCKET_URL = rawURL
+  .replace('https://', '')
+  .replace('http://', '')
+  .replace(/\/$/, ''); // Remover trailing slash si existe
 
-console.log('🔧 [SocketService] Variables de entorno:');
-console.log('   - VITE_SOCKET_URL:', import.meta.env.VITE_SOCKET_URL);
-console.log('   - SOCKET_URL limpia (sin protocolo):', SOCKET_URL);
+console.log('🔧 [SocketService] Configuración de conexión:');
+console.log('   - URL original (VITE_SOCKET_URL):', rawURL);
+console.log('   - URL procesada (sin protocolo):', SOCKET_URL);
+console.log('   - Socket.io conectará a: wss://' + SOCKET_URL);
 
 class SocketService {
   constructor() {
