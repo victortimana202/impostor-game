@@ -286,11 +286,12 @@ class SocketService {
     this.socket.on('pictionary-state-requested', callback);
   }
 
-  startPictionary(roomCode, playerNames) {
+  startPictionary(roomCode, playerNames, playersData) {
     console.log('🎨 [SocketService] Iniciando Pictionary...');
     console.log('🎨 [SocketService] RoomCode:', roomCode);
     console.log('🎨 [SocketService] Jugadores:', playerNames);
-    this.socket.emit('pictionary-start', { roomCode, playerNames });
+    console.log('🎨 [SocketService] Players data:', playersData);
+    this.socket.emit('pictionary-start', { roomCode, playerNames, playersData });
   }
 
   onPictionaryStarted(callback) {

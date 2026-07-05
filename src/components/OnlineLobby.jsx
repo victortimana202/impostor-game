@@ -42,23 +42,25 @@ export default function OnlineLobby({ onStartGame, onBack, setMyPlayerName, cfg,
       setPlayers(players);
     });
     
-    socketService.onPictionaryStarted(({ playerNames, hostId }) => {
+    socketService.onPictionaryStarted(({ playerNames, hostId, playersData }) => {
       console.log('🎨 [OnlineLobby] Pictionary iniciado! Jugadores:', playerNames);
       console.log('🎨 [OnlineLobby] Host ID:', hostId);
       console.log('🎨 [OnlineLobby] Mi Socket ID:', socketService.socket?.id);
+      console.log('🎨 [OnlineLobby] Players data recibida:', playersData);
       
       // Solo procesar si NO soy el host (para evitar doble inicio)
       if (socketService.socket?.id !== hostId) {
-        // Buscar MI nombre en el array de jugadores usando el socket ID
-        const myPlayer = players.find(p => p.id === socketService.socket?.id);
-        const myName = myPlayer?.name || localPlayerName || '';
+        // Buscar MI nombre usando el socket ID en los datos recibidos del servidor
+        const myPlayer = playersData?.find(p => p.id === socketService.socket?.id);
+        const myName = myPlayer?.name || localPlayerName || playerName || '';
         
         console.log('✅ [OnlineLobby] No soy host, mis datos:');
-        console.log('   - Mi jugador en array:', myPlayer);
+        console.log('   - Mi jugador encontrado:', myPlayer);
         console.log('   - Mi nombre detectado:', myName);
-        console.log('   - Jugadores actuales:', players);
+        console.log('   - Backup localPlayerName:', localPlayerName);
+        console.log('   - Backup playerName:', playerName);
         
-        onStartPictionary(playerNames, false, myName);
+        onStartPictionary(playerNames, false, myName, playersData);
       } else {
         console.log('ℹ️ [OnlineLobby] Soy el host, ya inicié localmente');
       }
@@ -155,13 +157,14 @@ export default function OnlineLobby({ onStartGame, onBack, setMyPlayerName, cfg,
     console.log('🎮 [OnlineLobby] Iniciando juego...');
     console.log('🎮 [OnlineLobby] Tipo:', gameType);
     console.log('🎮 [OnlineLobby] Jugadores:', playerNames);
+    console.log('🎮 [OnlineLobby] Players data completa:', players);
     console.log('🎮 [OnlineLobby] Mi nombre local:', localPlayerName);
     
     if (gameType === 'pictionary') {
-      // Enviar evento para que TODOS inicien Pictionary
-      socketService.startPictionary(currentRoom, playerNames);
+      // Enviar evento para que TODOS inicien Pictionary, incluyendo datos completos de jugadores
+      socketService.startPictionary(currentRoom, playerNames, players);
       // También iniciar localmente
-      onStartPictionary(playerNames, true, localPlayerName);
+      onStartPictionary(playerNames, true, localPlayerName, players);
     } else {
       onStartGame(playerNames, true, localPlayerName);
     }

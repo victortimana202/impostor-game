@@ -176,15 +176,17 @@ io.on('connection', (socket) => {
   });
 
   // Pictionary Game Events
-  socket.on('pictionary-start', ({ roomCode, playerNames }) => {
+  socket.on('pictionary-start', ({ roomCode, playerNames, playersData }) => {
     console.log('🎨 [Server] Iniciando Pictionary en sala:', roomCode);
     console.log('🎨 [Server] Jugadores:', playerNames);
+    console.log('🎨 [Server] Players data:', playersData);
     const room = rooms.get(roomCode);
     if (room) {
-      // Emitir a TODOS los jugadores, incluyendo el hostId
+      // Emitir a TODOS los jugadores, incluyendo el hostId y los datos completos
       io.to(roomCode).emit('pictionary-started', { 
         playerNames,
-        hostId: socket.id // Identificar quién es el host
+        hostId: socket.id, // Identificar quién es el host
+        playersData: playersData || room.players // Enviar datos completos de jugadores
       });
       console.log('✅ [Server] Evento pictionary-started emitido a todos, hostId:', socket.id);
     }

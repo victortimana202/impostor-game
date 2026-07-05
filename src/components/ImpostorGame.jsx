@@ -132,12 +132,21 @@ export default function ImpostorGame() {
     }
   };
 
-  const handlePictionaryStart = (playerNames, isHost, currentPlayerName) => {
+  const handlePictionaryStart = (playerNames, isHost, currentPlayerName, playersData) => {
+    console.log('🎮 [ImpostorGame] handlePictionaryStart llamado');
+    console.log('🎮 [ImpostorGame] playerNames:', playerNames);
+    console.log('🎮 [ImpostorGame] isHost:', isHost);
+    console.log('🎮 [ImpostorGame] currentPlayerName:', currentPlayerName);
+    console.log('🎮 [ImpostorGame] playersData:', playersData);
+    
     setIsOnlineHost(isHost);
     setGameMode('online');
     setMyPlayerName(currentPlayerName);
     
-    const playerList = playerNames.map(name => ({ name }));
+    // Usar playersData si está disponible, sino crear desde playerNames
+    const playerList = playersData || playerNames.map(name => ({ name }));
+    console.log('🎮 [ImpostorGame] playerList final:', playerList);
+    
     setPlayers(playerList);
     setShowPictionary(true);
   };

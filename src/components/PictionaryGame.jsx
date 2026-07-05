@@ -16,6 +16,9 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
   const [roundNumber, setRoundNumber] = useState(1);
   const [totalRounds, setTotalRounds] = useState(5);
   
+  // Mapeo anónimo de jugadores (A, B, C, D...) - para que sea incógnito
+  const [playerLabels, setPlayerLabels] = useState({}); // { playerName: 'A' }
+  
   // Sistema de intentos y pistas
   const [attempts, setAttempts] = useState({}); // { playerName: { wordOwner: attemptsLeft } }
   const [hintsUsed, setHintsUsed] = useState({}); // { playerName: { wordOwner: true/false } }
@@ -43,6 +46,15 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
     console.log('🎨 [PictionaryGame] MyPlayerName:', myPlayerName);
     console.log('🎨 [PictionaryGame] IsHost:', isHost);
     console.log('🎨 [PictionaryGame] Jugadores:', initialPlayers);
+    
+    // Crear mapeo anónimo de jugadores (A, B, C, D...)
+    const labels = {};
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    initialPlayers.forEach((p, idx) => {
+      labels[p.name] = alphabet[idx];
+    });
+    setPlayerLabels(labels);
+    console.log('🎭 [PictionaryGame] Labels anónimos:', labels);
     
     // Inicializar puntuaciones
     const initScores = {};
@@ -671,7 +683,7 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
                           }}>
                             <div>
                               <div style={{ fontSize: '14px', fontWeight: '700', color: isMyCanvas ? '#86efac' : C.text }}>
-                                {player.name} {isMyCanvas && '(TÚ)'}
+                                Canvas {playerLabels[player.name]} {isMyCanvas && '(TÚ)'}
                               </div>
                               {isMyCanvas && myWord && (
                                 <div style={{ fontSize: '12px', color: C.hint, marginTop: '2px' }}>
@@ -884,7 +896,7 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
                     {/* Canvas del jugador */}
                     <div style={{ marginBottom: '16px' }}>
                       <div style={{ fontSize: '13px', color: C.muted, marginBottom: '8px', fontWeight: '700' }}>
-                        🎨 Dibujo de {wordOwner}
+                        🎨 Canvas {playerLabels[wordOwner]}
                       </div>
                       <canvas
                         ref={el => {
@@ -1151,7 +1163,7 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
                         fontWeight: '700',
                         color: isCorrect ? '#86efac' : '#fca5a5'
                       }}>
-                        {isCorrect ? `✅ ¡Correcto! Era ${wordOwner} (+100 pts)` : `❌ Incorrecto. Era ${wordOwner}`}
+                        {isCorrect ? `✅ ¡Correcto! Era Canvas ${playerLabels[wordOwner]} (+100 pts)` : `❌ Incorrecto. Era Canvas ${playerLabels[wordOwner]}`}
                       </div>
                     ) : (
                       <div>
@@ -1192,9 +1204,11 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
                             outline: 'none'
                           }}
                         >
-                          <option value="">Selecciona un jugador...</option>
+                          <option value="">¿Quién dibujó esto?</option>
                           {initialPlayers.map(p => (
-                            <option key={p.name} value={p.name}>{p.name}</option>
+                            <option key={p.name} value={p.name}>
+                              Canvas {playerLabels[p.name]} {p.name === myPlayerName ? '(TÚ)' : ''}
+                            </option>
                           ))}
                         </select>
                       </div>
@@ -1411,9 +1425,11 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
                             outline: 'none'
                           }}
                         >
-                          <option value="">Selecciona un jugador...</option>
+                          <option value="">¿Quién dibujó esto?</option>
                           {initialPlayers.map(p => (
-                            <option key={p.name} value={p.name}>{p.name}</option>
+                            <option key={p.name} value={p.name}>
+                              Canvas {playerLabels[p.name]} {p.name === myPlayerName ? '(TÚ)' : ''}
+                            </option>
                           ))}
                         </select>
                       </div>
