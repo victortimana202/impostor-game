@@ -1,6 +1,7 @@
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+// TEMPORAL: Hardcoded hasta resolver problema de variables en Vercel
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'https://impostor-game-server-i1h5.onrender.com';
 
 console.log('🔧 [SocketService] Variables de entorno:');
 console.log('   - VITE_SOCKET_URL:', import.meta.env.VITE_SOCKET_URL);
