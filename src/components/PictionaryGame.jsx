@@ -8,6 +8,7 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
   const [myWord, setMyWord] = useState(null); // Mi palabra personal
   const [timeLeft, setTimeLeft] = useState(120); // 2 minutos para dibujar
   const [phase, setPhase] = useState('category-select'); // category-select, waiting, drawing, guessing, author-guessing, results, gameover
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const [myGuess, setMyGuess] = useState('');
   const [scores, setScores] = useState({});
   const [roundWinner, setRoundWinner] = useState(null);
@@ -247,13 +248,12 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
     }
   };
 
-  // Función para generar pistas estilo ahorcado con letras reveladas
+  // Función para generar pistas estilo ahorcado (SOLO guiones bajos - difícil)
   const getHangmanHint = (word, revealedIndices = []) => {
     if (!word) return '';
     return word.split('').map((char, idx) => {
       if (char === ' ') return '   '; // Espacio visible entre palabras
-      if (revealedIndices.includes(idx)) return char.toUpperCase() + ' ';
-      return '_ ';
+      return '_ '; // SIEMPRE mostrar guión bajo (sin revelar letras)
     }).join('');
   };
 

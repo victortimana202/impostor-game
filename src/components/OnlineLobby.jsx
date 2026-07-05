@@ -46,12 +46,19 @@ export default function OnlineLobby({ onStartGame, onBack, setMyPlayerName, cfg,
       console.log('🎨 [OnlineLobby] Pictionary iniciado! Jugadores:', playerNames);
       console.log('🎨 [OnlineLobby] Host ID:', hostId);
       console.log('🎨 [OnlineLobby] Mi Socket ID:', socketService.socket?.id);
-      console.log('🎨 [OnlineLobby] Mi nombre local guardado:', localPlayerName);
       
       // Solo procesar si NO soy el host (para evitar doble inicio)
       if (socketService.socket?.id !== hostId) {
-        console.log('✅ [OnlineLobby] No soy host, iniciando Pictionary con nombre:', localPlayerName);
-        onStartPictionary(playerNames, false, localPlayerName);
+        // Buscar MI nombre en el array de jugadores usando el socket ID
+        const myPlayer = players.find(p => p.id === socketService.socket?.id);
+        const myName = myPlayer?.name || localPlayerName || '';
+        
+        console.log('✅ [OnlineLobby] No soy host, mis datos:');
+        console.log('   - Mi jugador en array:', myPlayer);
+        console.log('   - Mi nombre detectado:', myName);
+        console.log('   - Jugadores actuales:', players);
+        
+        onStartPictionary(playerNames, false, myName);
       } else {
         console.log('ℹ️ [OnlineLobby] Soy el host, ya inicié localmente');
       }
