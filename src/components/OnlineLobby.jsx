@@ -40,6 +40,20 @@ export default function OnlineLobby({ onStartGame, onBack, setMyPlayerName, cfg,
       console.log('🔄 [OnlineLobby] Actualización de jugadores:', players);
       setPlayers(players);
     });
+    
+    socketService.onPictionaryStarted(({ playerNames, hostId }) => {
+      console.log('🎨 [OnlineLobby] Pictionary iniciado! Jugadores:', playerNames);
+      console.log('🎨 [OnlineLobby] Host ID:', hostId);
+      console.log('🎨 [OnlineLobby] Mi Socket ID:', socketService.socket?.id);
+      
+      // Solo procesar si NO soy el host (para evitar doble inicio)
+      if (socketService.socket?.id !== hostId) {
+        console.log('✅ [OnlineLobby] No soy host, iniciando Pictionary');
+        onStartPictionary(playerNames, false, playerName);
+      } else {
+        console.log('ℹ️ [OnlineLobby] Soy el host, ya inicié localmente');
+      }
+    });
 
     socketService.onError(({ message }) => {
       console.error('❌ [OnlineLobby] Error recibido:', message);
@@ -127,7 +141,14 @@ export default function OnlineLobby({ onStartGame, onBack, setMyPlayerName, cfg,
 
   const handleStartGame = () => {
     const playerNames = players.map(p => p.name);
+    console.log('🎮 [OnlineLobby] Iniciando juego...');
+    console.log('🎮 [OnlineLobby] Tipo:', gameType);
+    console.log('🎮 [OnlineLobby] Jugadores:', playerNames);
+    
     if (gameType === 'pictionary') {
+      // Enviar evento para que TODOS inicien Pictionary
+      socketService.startPictionary(currentRoom, playerNames);
+      // También iniciar localmente
       onStartPictionary(playerNames, true, playerName);
     } else {
       onStartGame(playerNames, true, playerName);

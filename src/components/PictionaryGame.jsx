@@ -224,6 +224,30 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
     }
   };
 
+  // Función para generar pistas estilo ahorcado
+  const getHangmanHint = (word, lettersRevealed = 1) => {
+    if (!word) return '';
+    
+    const wordLength = word.length;
+    const revealed = new Set();
+    
+    // Revelar algunas letras aleatorias
+    const positions = Array.from({ length: wordLength }, (_, i) => i);
+    const shuffled = positions.sort(() => Math.random() - 0.5);
+    
+    for (let i = 0; i < Math.min(lettersRevealed, wordLength); i++) {
+      revealed.add(shuffled[i]);
+    }
+    
+    // Primera letra siempre visible
+    revealed.add(0);
+    
+    return word.split('').map((char, idx) => {
+      if (char === ' ') return '  '; // Espacio visible
+      return revealed.has(idx) ? char : '_';
+    }).join(' ');
+  };
+
   const submitGuess = () => {
     if (!myGuess.trim() || (phase !== 'drawing' && phase !== 'discussion') || roundWinner) return;
 
@@ -659,6 +683,38 @@ export default function PictionaryGame({ roomCode, players: initialPlayers, onBa
                     lineHeight: 1.5
                   }}>
                     💡 Mira los dibujos de todos. ¡Puedes adivinar múltiples palabras!
+                  </div>
+
+                  {/* Mostrar pistas de las palabras de otros jugadores */}
+                  <div style={{ marginBottom: '12px' }}>
+                    {Object.entries(playerWords).map(([wordOwner, wordData]) => {
+                      if (wordOwner === myPlayerName) return null; // No mostrar mi propia palabra
+                      return (
+                        <div key={wordOwner} style={{
+                          padding: '10px',
+                          marginBottom: '8px',
+                          background: 'rgba(255,255,255,0.03)',
+                          borderRadius: '8px',
+                          border: `1px solid ${C.border}`
+                        }}>
+                          <div style={{ fontSize: '12px', color: C.muted, marginBottom: '4px' }}>
+                            👤 {wordOwner}
+                          </div>
+                          <div style={{ 
+                            fontSize: '18px', 
+                            fontWeight: '700', 
+                            fontFamily: 'monospace',
+                            letterSpacing: '2px',
+                            color: C.green
+                          }}>
+                            {getHangmanHint(wordData.word, Math.floor(wordData.word.length / 3))}
+                          </div>
+                          <div style={{ fontSize: '11px', color: C.hint, marginTop: '2px' }}>
+                            {wordData.word.length} letras • {wordData.category}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
 
                   <div style={{ display: 'flex', gap: '8px' }}>
