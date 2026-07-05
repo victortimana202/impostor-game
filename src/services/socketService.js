@@ -286,6 +286,17 @@ class SocketService {
     this.socket.on('pictionary-state-requested', callback);
   }
 
+  startPictionary(roomCode, playerNames) {
+    console.log('🎨 [SocketService] Iniciando Pictionary...');
+    console.log('🎨 [SocketService] RoomCode:', roomCode);
+    console.log('🎨 [SocketService] Jugadores:', playerNames);
+    this.socket.emit('pictionary-start', { roomCode, playerNames });
+  }
+
+  onPictionaryStarted(callback) {
+    this.socket.on('pictionary-started', callback);
+  }
+
   offPictionary() {
     if (this.socket) {
       this.socket.off('pictionary-update');
@@ -293,6 +304,7 @@ class SocketService {
       this.socket.off('pictionary-drawing');
       this.socket.off('pictionary-clear-canvas');
       this.socket.off('pictionary-state-requested');
+      this.socket.off('pictionary-started');
     }
   }
 

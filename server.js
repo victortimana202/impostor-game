@@ -176,6 +176,14 @@ io.on('connection', (socket) => {
   });
 
   // Pictionary Game Events
+  socket.on('pictionary-start', ({ roomCode, playerNames }) => {
+    console.log('🎨 [Server] Iniciando Pictionary en sala:', roomCode);
+    console.log('🎨 [Server] Jugadores:', playerNames);
+    // Emitir a TODOS los jugadores (incluido el host)
+    io.to(roomCode).emit('pictionary-started', { playerNames });
+    console.log('✅ [Server] Evento pictionary-started emitido a todos');
+  });
+
   socket.on('pictionary-sync-state', ({ roomCode, gameState }) => {
     console.log('📤 [Server] Sincronizando estado Pictionary en sala:', roomCode);
     socket.to(roomCode).emit('pictionary-update', { gameState });
